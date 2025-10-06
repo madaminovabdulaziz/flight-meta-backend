@@ -1,0 +1,1148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Airbridge Backend Mindmap</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+            padding: 20px;
+            color: #e2e8f0;
+        }
+        
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+        
+        h1 {
+            text-align: center;
+            color: #0EA5E9;
+            margin-bottom: 10px;
+            font-size: 2.5em;
+            text-shadow: 0 2px 10px rgba(14, 165, 233, 0.3);
+        }
+        
+        .subtitle {
+            text-align: center;
+            color: #94a3b8;
+            margin-bottom: 30px;
+            font-size: 1.1em;
+        }
+        
+        .legend {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(255,255,255,0.1);
+            padding: 8px 16px;
+            border-radius: 20px;
+        }
+        
+        .legend-box {
+            width: 20px;
+            height: 20px;
+            border-radius: 4px;
+        }
+        
+        .status-complete { background: #10b981; }
+        .status-partial { background: #f59e0b; }
+        .status-missing { background: #ef4444; }
+        .status-future { background: #6366f1; }
+        
+        .mindmap {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 25px;
+            margin-bottom: 40px;
+        }
+        
+        .branch {
+            background: rgba(255,255,255,0.05);
+            border-radius: 15px;
+            padding: 25px;
+            border: 2px solid rgba(255,255,255,0.1);
+            transition: all 0.3s ease;
+        }
+        
+        .branch:hover {
+            transform: translateY(-5px);
+            border-color: #0EA5E9;
+            box-shadow: 0 10px 30px rgba(14, 165, 233, 0.2);
+        }
+        
+        .branch-title {
+            font-size: 1.5em;
+            font-weight: 700;
+            margin-bottom: 20px;
+            color: #0EA5E9;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .branch-icon {
+            font-size: 1.3em;
+        }
+        
+        .section {
+            margin-bottom: 20px;
+        }
+        
+        .section-title {
+            font-weight: 600;
+            margin-bottom: 10px;
+            color: #cbd5e1;
+            font-size: 1.1em;
+        }
+        
+        .item {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            margin-bottom: 8px;
+            padding: 8px;
+            border-radius: 6px;
+            background: rgba(255,255,255,0.03);
+        }
+        
+        .item-status {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-top: 4px;
+            flex-shrink: 0;
+        }
+        
+        .item-text {
+            flex: 1;
+            line-height: 1.5;
+        }
+        
+        .item-note {
+            font-size: 0.85em;
+            color: #94a3b8;
+            margin-top: 4px;
+        }
+        
+        .priority-high {
+            border-left: 3px solid #ef4444;
+        }
+        
+        .priority-medium {
+            border-left: 3px solid #f59e0b;
+        }
+        
+        .priority-low {
+            border-left: 3px solid #6366f1;
+        }
+        
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .stat-card {
+            background: rgba(255,255,255,0.05);
+            padding: 20px;
+            border-radius: 12px;
+            text-align: center;
+            border: 2px solid rgba(255,255,255,0.1);
+        }
+        
+        .stat-number {
+            font-size: 2.5em;
+            font-weight: 700;
+            color: #0EA5E9;
+        }
+        
+        .stat-label {
+            color: #94a3b8;
+            margin-top: 5px;
+        }
+        
+        .roadmap {
+            background: rgba(255,255,255,0.05);
+            border-radius: 15px;
+            padding: 30px;
+            margin-top: 30px;
+        }
+        
+        .roadmap-title {
+            font-size: 2em;
+            color: #0EA5E9;
+            margin-bottom: 25px;
+            text-align: center;
+        }
+        
+        .phase {
+            margin-bottom: 30px;
+            padding: 20px;
+            background: rgba(255,255,255,0.03);
+            border-radius: 10px;
+            border-left: 4px solid #0EA5E9;
+        }
+        
+        .phase-header {
+            font-size: 1.3em;
+            font-weight: 700;
+            color: #0EA5E9;
+            margin-bottom: 15px;
+        }
+        
+        .phase-timeline {
+            color: #f59e0b;
+            font-size: 0.9em;
+            margin-bottom: 10px;
+        }
+        
+        .task-list {
+            list-style: none;
+            padding-left: 0;
+        }
+        
+        .task-list li {
+            padding: 8px 0;
+            padding-left: 25px;
+            position: relative;
+        }
+        
+        .task-list li:before {
+            content: "▸";
+            position: absolute;
+            left: 5px;
+            color: #0EA5E9;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>✈️ Airbridge Backend Architecture</h1>
+        <p class="subtitle">FastAPI + Python | Current State Analysis & Development Roadmap</p>
+        
+        <div class="legend">
+            <div class="legend-item">
+                <div class="legend-box status-complete"></div>
+                <span>✅ Complete & Working</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-box status-partial"></div>
+                <span>🚧 Partial / Needs Work</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-box status-missing"></div>
+                <span>❌ Missing / Critical</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-box status-future"></div>
+                <span>🔮 Future Enhancement</span>
+            </div>
+        </div>
+        
+        <div class="stats">
+            <div class="stat-card">
+                <div class="stat-number">75%</div>
+                <div class="stat-label">MVP Complete</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">7</div>
+                <div class="stat-label">API Endpoints Built</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">3-4</div>
+                <div class="stat-label">Weeks to Launch</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">5</div>
+                <div class="stat-label">Critical Tasks Left</div>
+            </div>
+        </div>
+        
+        <div class="mindmap">
+            <!-- Core Infrastructure -->
+            <div class="branch">
+                <div class="branch-title">
+                    <span class="branch-icon">🏗️</span>
+                    Core Infrastructure
+                </div>
+                
+                <div class="section">
+                    <div class="section-title">Technology Stack</div>
+                    <div class="item">
+                        <div class="item-status status-complete"></div>
+                        <div class="item-text">
+                            FastAPI (Python async framework)
+                            <div class="item-note">Modern, fast, production-ready</div>
+                        </div>
+                    </div>
+                    <div class="item">
+                        <div class="item-status status-complete"></div>
+                        <div class="item-text">
+                            PostgreSQL + SQLAlchemy (async)
+                            <div class="item-note">Proper async database handling</div>
+                        </div>
+                    </div>
+                    <div class="item">
+                        <div class="item-status status-complete"></div>
+                        <div class="item-text">
+                            Redis for caching
+                            <div class="item-note">With compression (zlib) for efficiency</div>
+                        </div>
+                    </div>
+                    <div class="item">
+                        <div class="item-status status-complete"></div>
+                        <div class="item-text">
+                            Pydantic schemas for validation
+                            <div class="item-note">Type-safe API contracts</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="section">
+                    <div class="section-title">Architecture Patterns</div>
+                    <div class="item">
+                        <div class="item-status status-complete"></div>
+                        <div class="item-text">Clean separation: models, schemas, services</div>
+                    </div>
+                    <div class="item">
+                        <div class="item-status status-complete"></div>
+                        <div class="item-text">Circuit breaker pattern (Amadeus service)</div>
+                    </div>
+                    <div class="item">
+                        <div class="item-status status-complete"></div>
+                        <div class="item-text">Retry logic with exponential backoff</div>
+                    </div>
+                    <div class="item">
+                        <div class="item-status status-partial"></div>
+                        <div class="item-text">
+                            Error handling & logging
+                            <div class="item-note">Good foundation, needs more coverage</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Authentication & Users -->
+            <div class="branch">
+                <div class="branch-title">
+                    <span class="branch-icon">🔐</span>
+                    Authentication & Users
+                </div>
+                
+                <div class="section">
+                    <div class="section-title">✅ Implemented</div>
+                    <div class="item">
+                        <div class="item-status status-complete"></div>
+                        <div class="item-text">JWT token authentication</div>
+                    </div>
+                    <div class="item">
+                        <div class="item-status status-complete"></div>
+                        <div class="item-text">User registration endpoint</div>
+                    </div>
+                    <div class="item">
+                        <div class="item-status status-complete"></div>
+                        <div class="item-text">Login endpoint with OAuth2</div>
+                    </div>
+                    <div class="item">
+                        <div class="item-status status-complete"></div>
+                        <div class="item-text">Password hashing (bcrypt)</div>
+                    </div>
+                    <div class="item">
+                        <div class="item-status status-complete"></div>
+                        <div class="item-text">
+                            get_current_user dependency
+                            <div class="item-note">For protected routes</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="section">
+                    <div class="section-title">❌ Missing for MVP</div>
+                    <div class="item priority-high">
+                        <div class="item-status status-missing"></div>
+                        <div class="item-text">
+                            Email verification
+                            <div class="item-note">CRITICAL: Prevent fake accounts</div>
+                        </div>
+                    </div>
+                    <div class="item priority-high">
+                        <div class="item-status status-missing"></div>
+                        <div class="item-text">
+                            Password reset flow
+                            <div class="item-note">Users will forget passwords!</div>
+                        </div>
+                    </div>
+                    <div class="item priority-medium">
+                        <div class="item-status status-missing"></div>
+                        <div class="item-text">User profile management (update email, password)</div>
+                    </div>
+                </div>
+                
+                <div class="section">
+                    <div class="section-title">🔮 Future</div>
+                    <div class="item">
+                        <div class="item-status status-future"></div>
+                        <div class="item-text">Social login (Google, Facebook)</div>
+                    </div>
+                    <div class="item">
+                        <div class="item-status status-future"></div>
+                        <div class="item-text">Two-factor authentication (2FA)</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Flight Search -->
+            <div class="branch">
+                <div class="branch-title">
+                    <span class="branch-icon">✈️</span>
+                    Flight Search Engine
+                </div>
+                
+                <div class="section">
+                    <div class="section-title">✅ Implemented</div>
+                    <div class="item">
+                        <div class="item-status status-complete"></div>
+                        <div class="item-text">
+                            Amadeus API integration
+                            <div class="item-note">Full search with all parameters</div>
+                        </div>
+                    </div>
+                    <div class="item">
+                        <div class="item-status status-complete"></div>
+                        <div class="item-text">One-way & round-trip search</div>
+                    </div>
+                    <div class="item">
+                        <div class="item-status status-complete"></div>
+                        <div class="item-text">Adults, children, infants support</div>
+                    </div>
+                    <div class="item">
+                        <div class="item-status status-complete"></div>
+                        <div class="item-text">Cabin class filtering (Economy, Business, etc.)</div>
+                    </div>
+                    <div class="item">
+                        <div class="item-status status-complete"></div>
+                        <div class="item-text">Non-stop filter</div>
+                    </div>
+                    <div class="item">
+                        <div class="item-status status-complete"></div>
+                        <div class="item-text">
+                            Comprehensive caching strategy
+                            <div class="item-note">15min TTL, includes all search params in key</div>
+                        </div>
+                    </div>
+                    <div class="item">
+                        <div class="item-status status-complete"></div>
+                        <div class="item-text">Flexible date search</div>
+                    </div>
+                    <div class="item">
+                        <div class="item-status status-complete"></div>
+                        <div class="item-text">
+                            Detailed flight segments with layovers
+                            <div class="item-note">Nested structure: legs → segments</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="section">
+                    <div class="section-title">🚧 Needs Attention</div>
+                    <div class="item priority-medium">
+                        <div class="item-status status-partial"></div>
+                        <div class="item-text">
+                            Flight details endpoint
+                            <div class="item-note">Implemented but may need testing</div>
+                        </div>
+                    </div>
+                    <div class="item priority-low">
+                        <div class="item-status status-partial"></div>
+                        <div class="item-text">
+                            Multi-city search
+                            <div class="item-note">Placeholder exists, not implemented</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="section">
+                    <div class="section-title">💡 Enhancement Ideas</div>
+                    <div class="item">
+                        <div class="item-status status-future"></div>
+                        <div class="item-text">Price prediction / alerts</div>
+                    </div>
+                    <div class="item">
+                        <div class="item-status status-future"></div>
+                        <div class="item-text">Airline preference filtering</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Airports Database -->
+            <div class="branch">
+                <div class="branch-title">
+                    <span class="branch-icon">🌍</span>
+                    Airports Database
+                </div>
+                
+                <div class="section">
+                    <div class="section-title">✅ Excellent Implementation</div>
+                    <div class="item">
+                        <div class="item-status status-complete"></div>
+                        <div class="item-text">
+                            Autocomplete search
+                            <div class="item-note">By IATA, city, or airport name</div>
+                        </div>
+                    </div>
+                    <div class="item">
+                        <div class="item-status status-complete"></div>
+                        <div class="item-text">Popular airports endpoint</div>
+                    </div>
+                    <div class="item">
+                        <div class="item-status status-complete"></div>
+                        <div class="item-text">Nearby airports (geolocation)</div>
+                    </div>
+                    <div class="item">
+                        <div class="item-status status-complete"></div>
+                        <div class="item-text">Country-based filtering</div>
+                    </div>
+                    <div class="item">
+                        <div class="item-status status-complete"></div>
+                        <div class="item-text">Airport details by IATA</div>
+                    </div>
+                    <div class="item">
+                        <div class="item-status status-complete"></div>
+                        <div class="item-text">
+                            Smart caching (24h for search, 7d for popular)
+                            <div class="item-note">Airports rarely change</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="section">
+                    <div class="section-title">📝 TODO</div>
+                    <div class="item priority-high">
+                        <div class="item-status status-missing"></div>
+                        <div class="item-text">
+                            Seed database with airport data
+                            <div class="item-note">Use OpenFlights or similar dataset</div>
+                        </div>
+                    </div>
+                    <div class="item priority-low">
+                        <div class="item-status status-future"></div>
+                        <div class="item-text">
+                            Dynamic popular airports based on clicks
+                            <div class="item-note">You have a TODO comment for this</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Revenue Tracking -->
+            <div class="branch">
+                <div class="branch-title">
+                    <span class="branch-icon">💰</span>
+                    Revenue & Click Tracking
+                </div>
+                
+                <div class="section">
+                    <div class="section-title">✅ Impressive Implementation</div>
+                    <div class="item">
+                        <div class="item-status status-complete"></div>
+                        <div class="item-text">
+                            Click tracking endpoint
+                            <div class="item-note">Tracks when users click to partner sites</div>
+                        </div>
+                    </div>
+                    <div class="item">
+                        <div class="item-status status-complete"></div>
+                        <div class="item-text">Session ID management (anonymous users)</div>
+                    </div>
+                    <div class="item">
+                        <div class="item-status status-complete"></div>
+                        <div class="item-text">Partner validation</div>
+                    </div>
+                    <div class="item">
+                        <div class="item-status status-complete"></div>
+                        <div class="item-text">Commission calculation logic</div>
+                    </div>
+                    <div class="item">
+                        <div class="item-status status-complete"></div>
+                        <div class="item-text">
+                            Secure webhook for conversion tracking
+                            <div class="item-note">HMAC signature verification</div>
+                        </div>
+                    </div>
+                    <div class="item">
+                        <div class="item-status status-complete"></div>
+                        <div class="item-text">Idempotency protection (no double-counting)</div>
+                    </div>
+                    <div class="item">
+                        <div class="item-status status-complete"></div>
+                        <div class="item-text">Privacy features (IP hashing)</div>
+                    </div>
+                    <div class="item">
+                        <div class="item-status status-complete"></div>
+                        <div class="item-text">Analytics endpoints (routes, conversion rate)</div>
+                    </div>
+                </div>
+                
+                <div class="section">
+                    <div class="section-title">❌ Missing</div>
+                    <div class="item priority-high">
+                        <div class="item-status status-missing"></div>
+                        <div class="item-text">
+                            Partner management admin panel
+                            <div class="item-note">Add/edit partners and their commission rates</div>
+                        </div>
+                    </div>
+                    <div class="item priority-high">
+                        <div class="item-status status-missing"></div>
+                        <div class="item-text">
+                            Seed initial partners (Skyscanner, Kiwi, etc.)
+                            <div class="item-note">Need to set up affiliate relationships</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Saved Searches -->
+            <div class="branch">
+                <div class="branch-title">
+                    <span class="branch-icon">💾</span>
+                    Saved Searches
+                </div>
+                
+                <div class="section">
+                    <div class="section-title">✅ Complete CRUD</div>
+                    <div class="item">
+                        <div class="item-status status-complete"></div>
+                        <div class="item-text">Create saved search</div>
+                    </div>
+                    <div class="item">
+                        <div class="item-status status-complete"></div>
+                        <div class="item-text">List user's searches (paginated)</div>
+                    </div>
+                    <div class="item">
+                        <div class="item-status status-complete"></div>
+                        <div class="item-text">Get single search</div>
+                    </div>
+                    <div class="item">
+                        <div class="item-status status-complete"></div>
+                        <div class="item-text">Update search</div>
+                    </div>
+                    <div class="item">
+                        <div class="item-status status-complete"></div>
+                        <div class="item-text">Delete search</div>
+                    </div>
+                </div>
+                
+                <div class="section">
+                    <div class="section-title">🔮 Future</div>
+                    <div class="item">
+                        <div class="item-status status-future"></div>
+                        <div class="item-text">Price alerts via email</div>
+                    </div>
+                    <div class="item">
+                        <div class="item-status status-future"></div>
+                        <div class="item-text">Price drop notifications</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Payment Integration -->
+            <div class="branch">
+                <div class="branch-title">
+                    <span class="branch-icon">💳</span>
+                    Payment Integration
+                </div>
+                
+                <div class="section">
+                    <div class="section-title">❌ CRITICAL - Not Started</div>
+                    <div class="item priority-high">
+                        <div class="item-status status-missing"></div>
+                        <div class="item-text">
+                            Payme integration
+                            <div class="item-note">Most popular in Uzbekistan</div>
+                        </div>
+                    </div>
+                    <div class="item priority-high">
+                        <div class="item-status status-missing"></div>
+                        <div class="item-text">
+                            Click integration
+                            <div class="item-note">Second most popular</div>
+                        </div>
+                    </div>
+                    <div class="item priority-high">
+                        <div class="item-status status-missing"></div>
+                        <div class="item-text">Uzcard/Humo support</div>
+                    </div>
+                    <div class="item priority-medium">
+                        <div class="item-status status-missing"></div>
+                        <div class="item-text">
+                            Stripe integration
+                            <div class="item-note">For international cards</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="section">
+                    <div class="section-title">📝 Payment Flow Needed</div>
+                    <div class="item priority-high">
+                        <div class="item-status status-missing"></div>
+                        <div class="item-text">Create payment session endpoint</div>
+                    </div>
+                    <div class="item priority-high">
+                        <div class="item-status status-missing"></div>
+                        <div class="item-text">Payment confirmation webhook</div>
+                    </div>
+                    <div class="item priority-high">
+                        <div class="item-status status-missing"></div>
+                        <div class="item-text">Payment status checking</div>
+                    </div>
+                </div>
+                
+                <div class="section">
+                    <div class="section-title">⚠️ Important Note</div>
+                    <div class="item">
+                        <div class="item-text">
+                            <strong>Decision needed:</strong> Are you booking directly or redirecting?
+                            <div class="item-note">If redirecting to partners, you don't need payment integration initially!</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Booking System -->
+            <div class="branch">
+                <div class="branch-title">
+                    <span class="branch-icon">🎫</span>
+                    Booking System
+                </div>
+                
+                <div class="section">
+                    <div class="section-title">🚧 Partial - In Amadeus Service</div>
+                    <div class="item">
+                        <div class="item-status status-complete"></div>
+                        <div class="item-text">
+                            price_flight_offer()
+                            <div class="item-note">Confirm price before booking</div>
+                        </div>
+                    </div>
+                    <div class="item">
+                        <div class="item-status status-complete"></div>
+                        <div class="item-text">
+                            create_flight_order()
+                            <div class="item-note">Creates PNR with Amadeus</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="section">
+                    <div class="section-title">❌ Missing API Endpoints</div>
+                    <div class="item priority-high">
+                        <div class="item-status status-missing"></div>
+                        <div class="item-text">
+                            POST /bookings/create endpoint
+                            <div class="item-note">Expose booking functionality to frontend</div>
+                        </div>
+                    </div>
+                    <div class="item priority-high">
+                        <div class="item-status status-missing"></div>
+                        <div class="item-text">GET /bookings (user's booking history)</div>
+                    </div>
+                    <div class="item priority-high">
+                        <div class="item-status status-missing"></div>
+                        <div class="item-text">GET /bookings/{id} (booking details)</div>
+                    </div>
+                    <div class="item priority-medium">
+                        <div class="item-status status-missing"></div>
+                        <div class="item-text">Booking model in database</div>
+                    </div>
+                    <div class="item priority-medium">
+                        <div class="item-status status-missing"></div>
+                        <div class="item-text">Email confirmation system</div>
+                    </div>
+                </div>
+                
+                <div class="section">
+                    <div class="section-title">🔮 Future</div>
+                    <div class="item">
+                        <div class="item-status status-future"></div>
+                        <div class="item-text">Booking cancellation/modification</div>
+                    </div>
+                    <div class="item">
+                        <div class="item-status status-future"></div>
+                        <div class="item-text">Check-in reminders</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Email System -->
+            <div class="branch">
+                <div class="branch-title">
+                    <span class="branch-icon">📧</span>
+                    Email System
+                </div>
+                
+                <div class="section">
+                    <div class="section-title">❌ Not Implemented</div>
+                    <div class="item priority-high">
+                        <div class="item-status status-missing"></div>
+                        <div class="item-text">
+                            SendGrid/Mailgun integration
+                            <div class="item-note">For transactional emails</div>
+                        </div>
+                    </div>
+                    <div class="item priority-high">
+                        <div class="item-status status-missing"></div>
+                        <div class="item-text">Booking confirmation emails</div>
+                    </div>
+                    <div class="item priority-high">
+                        <div class="item-status status-missing"></div>
+                        <div class="item-text">Email verification emails</div>
+                    </div>
+                    <div class="item priority-high">
+                        <div class="item-status status-missing"></div>
+                        <div class="item-text">Password reset emails</div>
+                    </div>
+                    <div class="item priority-medium">
+                        <div class="item-status status-missing"></div>
+                        <div class="item-text">Email templates (HTML)</div>
+                    </div>
+                </div>
+                
+                <div class="section">
+                    <div class="section-title">💡 Quick Win</div>
+                    <div class="item">
+                        <div class="item-text">
+                            Start with SendGrid free tier (100 emails/day)
+                            <div class="item-note">Upgrade as you scale</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Admin & Monitoring -->
+            <div class="branch">
+                <div class="branch-title">
+                    <span class="branch-icon">⚙️</span>
+                    Admin & Monitoring
+                </div>
+                
+                <div class="section">
+                    <div class="section-title">✅ Basic Analytics Present</div>
+                    <div class="item">
+                        <div class="item-status status-complete"></div>
+                        <div class="item-text">Click analytics (top routes, conversion rate)</div>
+                    </div>
+                    <div class="item">
+                        <div class="item-status status-complete"></div>
+                        <div class="item-text">User click stats endpoint</div>
+                    </div>
+                </div>
+                
+                <div class="section">
+                    <div class="section-title">❌ Missing</div>
+                    <div class="item priority-medium">
+                        <div class="item-status status-missing"></div>
+                        <div class="item-text">
+                            Admin authentication/authorization
+                            <div class="item-note">Separate admin role</div>
+                        </div>
+                    </div>
+                    <div class="item priority-medium">
+                        <div class="item-status status-missing"></div>
+                        <div class="item-text">Revenue dashboard endpoints</div>
+                    </div>
+                    <div class="item priority-low">
+                        <div class="item-status status-missing"></div>
+                        <div class="item-text">User management (ban, delete)</div>
+                    </div>
+                    <div class="item priority-low">
+                        <div class="item-status status-missing"></div>
+                        <div class="item-text">System health monitoring</div>
+                    </div>
+                </div>
+                
+                <div class="section">
+                    <div class="section-title">🔮 Post-MVP</div>
+                    <div class="item">
+                        <div class="item-status status-future"></div>
+                        <div class="item-text">Sentry for error tracking</div>
+                    </div>
+                    <div class="item">
+                        <div class="item-status status-future"></div>
+                        <div class="item-text">DataDog/Prometheus for metrics</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Testing & Quality -->
+            <div class="branch">
+                <div class="branch-title">
+                    <span class="branch-icon">🧪</span>
+                    Testing & Quality
+                </div>
+                
+                <div class="section">
+                    <div class="section-title">❌ Needs Implementation</div>
+                    <div class="item priority-medium">
+                        <div class="item-status status-missing"></div>
+                        <div class="item-text">
+                            Unit tests for services
+                            <div class="item-note">Especially amadeus_service</div>
+                        </div>
+                    </div>
+                    <div class="item priority-medium">
+                        <div class="item-status status-missing"></div>
+                        <div class="item-text">Integration tests for endpoints</div>
+                    </div>
+                    <div class="item priority-low">
+                        <div class="item-status status-missing"></div>
+                        <div class="item-text">API documentation (OpenAPI/Swagger)</div>
+                    </div>
+                </div>
+                
+                <div class="section">
+                    <div class="section-title">💡 Priority</div>
+                    <div class="item">
+                        <div class="item-text">
+                            Test critical paths: search, booking, payment
+                            <div class="item-note">Start with these before launch</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Deployment -->
+            <div class="branch">
+                <div class="branch-title">
+                    <span class="branch-icon">🚀</span>
+                    Deployment & DevOps
+                </div>
+                
+                <div class="section">
+                    <div class="section-title">❌ Not Set Up Yet</div>
+                    <div class="item priority-high">
+                        <div class="item-status status-missing"></div>
+                        <div class="item-text">
+                            Production environment setup
+                            <div class="item-note">AWS/DigitalOcean/Railway</div>
+                        </div>
+                    </div>
+                    <div class="item priority-high">
+                        <div class="item-status status-missing"></div>
+                        <div class="item-text">Database hosting (managed PostgreSQL)</div>
+                    </div>
+                    <div class="item priority-high">
+                        <div class="item-status status-missing"></div>
+                        <div class="item-text">Redis hosting (managed or same server)</div>
+                    </div>
+                    <div class="item priority-high">
+                        <div class="item-status status-missing"></div>
+                        <div class="item-text">Domain & SSL certificate</div>
+                    </div>
+                    <div class="item priority-medium">
+                        <div class="item-status status-missing"></div>
+                        <div class="item-text">CI/CD pipeline (GitHub Actions)</div>
+                    </div>
+                    <div class="item priority-medium">
+                        <div class="item-status status-missing"></div>
+                        <div class="item-text">Environment variables management</div>
+                    </div>
+                    <div class="item priority-medium">
+                        <div class="item-status status-missing"></div>
+                        <div class="item-text">Database backup strategy</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="roadmap">
+            <div class="roadmap-title">🗺️ Path to MVP Launch</div>
+            
+            <div class="phase">
+                <div class="phase-header">Phase 1: Critical Backend Completion (Week 1-2)</div>
+                <div class="phase-timeline">⏱️ Est. 10-14 days | Priority: CRITICAL</div>
+                <ul class="task-list">
+                    <li><strong>Booking Endpoints</strong> - Create POST /bookings/create, GET /bookings, GET /bookings/{id}</li>
+                    <li><strong>Booking Database Model</strong> - Store booking details, PNR, passenger info</li>
+                    <li><strong>Email Service Integration</strong> - SendGrid setup for transactional emails</li>
+                    <li><strong>Booking Confirmation Emails</strong> - HTML templates + sending logic</li>
+                    <li><strong>Email Verification</strong> - Registration email with verification link</li>
+                    <li><strong>Password Reset Flow</strong> - Forgot password + reset token generation</li>
+                    <li><strong>Airport Database Seeding</strong> - Import airport data (OpenFlights dataset)</li>
+                    <li><strong>Partner Data Seeding</strong> - Add initial partners with commission rates</li>
+                </ul>
+            </div>
+            
+            <div class="phase">
+                <div class="phase-header">Phase 2: Payment Integration (Week 2-3)</div>
+                <div class="phase-timeline">⏱️ Est. 7-10 days | Priority: HIGH</div>
+                <ul class="task-list">
+                    <li><strong>Decision</strong> - Clarify business model: Direct booking vs. Partner redirect?</li>
+                    <li><strong>If Direct Booking:</strong>
+                        <ul style="margin-left: 25px; margin-top: 5px;">
+                            <li>Payme SDK integration</li>
+                            <li>Click SDK integration</li>
+                            <li>Payment webhook endpoints</li>
+                            <li>Payment status tracking</li>
+                        </ul>
+                    </li>
+                    <li><strong>If Partner Redirect:</strong>
+                        <ul style="margin-left: 25px; margin-top: 5px;">
+                            <li>Generate affiliate deeplinks</li>
+                            <li>Track click-through properly (already done!)</li>
+                            <li>Set up commission tracking webhooks (already done!)</li>
+                        </ul>
+                    </li>
+                    <li><strong>Testing</strong> - End-to-end payment flow testing</li>
+                </ul>
+            </div>
+            
+            <div class="phase">
+                <div class="phase-header">Phase 3: Polish & Testing (Week 3-4)</div>
+                <div class="phase-timeline">⏱️ Est. 5-7 days | Priority: MEDIUM</div>
+                <ul class="task-list">
+                    <li><strong>Error Handling</strong> - Consistent error responses across all endpoints</li>
+                    <li><strong>Input Validation</strong> - Double-check all Pydantic schemas</li>
+                    <li><strong>Rate Limiting</strong> - Prevent abuse (use slowapi or similar)</li>
+                    <li><strong>API Documentation</strong> - Ensure Swagger/OpenAPI is complete</li>
+                    <li><strong>Integration Tests</strong> - Critical path testing (search → select → book)</li>
+                    <li><strong>Load Testing</strong> - Basic stress testing with locust or similar</li>
+                    <li><strong>Security Audit</strong> - SQL injection prevention, CORS setup, etc.</li>
+                </ul>
+            </div>
+            
+            <div class="phase">
+                <div class="phase-header">Phase 4: Deployment (Week 4)</div>
+                <div class="phase-timeline">⏱️ Est. 3-5 days | Priority: HIGH</div>
+                <ul class="task-list">
+                    <li><strong>Production Infrastructure</strong> - Set up AWS/DigitalOcean/Railway</li>
+                    <li><strong>Database Setup</strong> - Managed PostgreSQL instance</li>
+                    <li><strong>Redis Setup</strong> - Managed Redis or same server</li>
+                    <li><strong>Environment Config</strong> - Production environment variables</li>
+                    <li><strong>SSL Certificate</strong> - HTTPS for airbridge.uz</li>
+                    <li><strong>CI/CD Pipeline</strong> - Automated deployment from GitHub</li>
+                    <li><strong>Monitoring</strong> - Basic logging and error tracking</li>
+                    <li><strong>Database Migrations</strong> - Run Alembic migrations in production</li>
+                    <li><strong>Smoke Testing</strong> - Verify all endpoints work in production</li>
+                </ul>
+            </div>
+            
+            <div class="phase">
+                <div class="phase-header">Post-MVP Enhancements (Month 2+)</div>
+                <div class="phase-timeline">⏱️ Ongoing | Priority: LOW</div>
+                <ul class="task-list">
+                    <li>Price alerts & notifications</li>
+                    <li>Admin dashboard API</li>
+                    <li>Advanced analytics</li>
+                    <li>Multi-city search</li>
+                    <li>Social login (Google, Facebook)</li>
+                    <li>Mobile app API optimizations</li>
+                    <li>Booking modifications/cancellations</li>
+                    <li>Travel insurance integration</li>
+                    <li>Hotel search integration</li>
+                </ul>
+            </div>
+        </div>
+        
+        <div style="background: rgba(14, 165, 233, 0.1); border-radius: 15px; padding: 30px; margin-top: 30px; border: 2px solid #0EA5E9;">
+            <h2 style="color: #0EA5E9; margin-bottom: 20px; text-align: center;">🎯 Key Observations & Recommendations</h2>
+            
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">
+                <div style="background: rgba(16, 185, 129, 0.1); padding: 20px; border-radius: 10px; border-left: 4px solid #10b981;">
+                    <h3 style="color: #10b981; margin-bottom: 10px;">✅ What's Great</h3>
+                    <ul style="line-height: 1.8; color: #cbd5e1;">
+                        <li>Excellent code structure & patterns</li>
+                        <li>Proper async/await usage</li>
+                        <li>Smart caching strategy</li>
+                        <li>Circuit breaker for resilience</li>
+                        <li>Revenue tracking well thought out</li>
+                        <li>Security-conscious (HMAC webhooks)</li>
+                    </ul>
+                </div>
+                
+                <div style="background: rgba(239, 68, 68, 0.1); padding: 20px; border-radius: 10px; border-left: 4px solid #ef4444;">
+                    <h3 style="color: #ef4444; margin-bottom: 10px;">🚨 Critical Gaps</h3>
+                    <ul style="line-height: 1.8; color: #cbd5e1;">
+                        <li>No booking endpoints (just service layer)</li>
+                        <li>No email system</li>
+                        <li>No payment integration</li>
+                        <li>No deployment setup</li>
+                        <li>Missing email verification</li>
+                    </ul>
+                </div>
+                
+                <div style="background: rgba(245, 158, 11, 0.1); padding: 20px; border-radius: 10px; border-left: 4px solid #f59e0b;">
+                    <h3 style="color: #f59e0b; margin-bottom: 10px;">💡 Quick Wins</h3>
+                    <ul style="line-height: 1.8; color: #cbd5e1;">
+                        <li>Start with partner redirect model (no payment needed initially)</li>
+                        <li>Use SendGrid free tier</li>
+                        <li>Deploy to Railway.app (simplest)</li>
+                        <li>Use managed PostgreSQL</li>
+                        <li>Add FastAPI auto-docs</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div style="margin-top: 30px; padding: 20px; background: rgba(99, 102, 241, 0.1); border-radius: 10px;">
+                <h3 style="color: #6366f1; margin-bottom: 15px;">🤔 Key Decision Needed</h3>
+               
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                    <div style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 8px;">
+                        <strong style="color: #10b981;">Option A: Redirect Model</strong>
+                        <ul style="margin-top: 10px; line-height: 1.6; font-size: 0.95em;">
+                            <li>✅ Faster to launch (2-3 weeks)</li>
+                            <li>✅ No payment integration needed</li>
+                            <li>✅ Less liability</li>
+                            <li>❌ Lower margins</li>
+                            <li>❌ Less control over UX</li>
+                        </ul>
+                    </div>
+                    <div style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 8px;">
+                        <strong style="color: #f59e0b;">Option B: Direct Booking</strong>
+                        <ul style="margin-top: 10px; line-height: 1.6; font-size: 0.95em;">
+                            <li>✅ Higher margins</li>
+                            <li>✅ Full control over UX</li>
+                            <li>✅ Own customer relationship</li>
+                            <li>❌ Slower to launch (4-5 weeks)</li>
+                            <li>❌ Complex payment integration</li>
+                            <li>❌ More liability & support</li>
+                        </ul>
+                    </div>
+                </div>
+                
+            </div>
+        </div>
+        
+        <div style="text-align: center; margin-top: 40px; padding: 30px; background: rgba(14, 165, 233, 0.05); border-radius: 15px;">
+            <h2 style="color: #0EA5E9; margin-bottom: 15px;">🎯 Bottom Line</h2>
+            <p style="font-size: 1.3em; line-height: 1.8; color: #cbd5e1; max-width: 900px; margin: 0 auto;">
+                <strong>You're 75% done with MVP backend!</strong><br><br>
+                Your architecture is solid. Focus next 3-4 weeks on:<br>
+                1️⃣ Booking endpoints<br>
+                2️⃣ Email system<br>
+                3️⃣ Clarify business model (redirect vs. direct)<br>
+                4️⃣ Deploy to production<br><br>
+                <span style="color: #10b981; font-weight: 700;">You can realistically launch in 4 weeks.</span>
+            </p>
+        </div>
+    </div>
+</body>
+</html>

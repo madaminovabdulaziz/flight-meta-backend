@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FlyUz - Flight Search</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .loader { border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(0, 0, 0, 0.6); display: flex; align-items: center; justify-content: center; z-index: 1000; }
+        .modal-container { background-color: #ffffff; padding: 2rem; border-radius: 1rem; width: 90%; max-width: 600px; position: relative; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); }
+        .auth-modal-container { max-width: 400px; }
+        .modal-close-btn { position: absolute; top: 1rem; right: 1rem; cursor: pointer; color: #9ca3af; font-size: 1.5rem; line-height: 1; }
+        .overflow-hidden { overflow: hidden; }
+        .tab-btn { padding: 0.5rem 1rem; border-radius: 0.5rem; font-weight: 500; cursor: pointer; transition: all 0.2s; }
+        .tab-btn.active { background-color: #3b82f6; color: white; }
+        .tab-btn:not(.active) { background-color: #e5e7eb; color: #4b5563; }
+    </style>
+</head>
+<body class="bg-gray-100">
+
+    <div id="main-content">
+        <div class="container mx-auto p-4 md:p-8">
+            <header class="flex justify-between items-center mb-8">
+                <h1 class="text-4xl font-bold text-blue-600">FlyUz</h1>
+                <div id="auth-section" class="flex items-center gap-4">
+                    <div id="logged-out-view"><button id="login-btn" class="font-semibold text-gray-600 hover:text-blue-600">Login</button><button id="register-btn" class="bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700">Register</button></div>
+                    <div id="logged-in-view" class="hidden items-center gap-4"><span id="user-email" class="font-semibold text-gray-700"></span><button id="logout-btn" class="font-semibold text-gray-600 hover:text-red-600">Logout</button></div>
+                </div>
+            </header>
+            
+            <div class="bg-white p-8 rounded-2xl shadow-lg mb-8">
+                <!-- NEW: Search type toggle -->
+                <div class="flex items-center gap-4 mb-6">
+                    <button id="specific-date-tab" class="tab-btn active">Specific Date</button>
+                    <button id="flexible-trip-tab" class="tab-btn">Flexible Trip</button>
+                </div>
+                
+                <form id="search-form" class="grid grid-cols-1 md:grid-cols-4 gap-6 items-end">
+                    <div><label for="origin" class="block text-sm font-medium text-gray-700 mb-1">From</label><input type="text" id="origin" name="origin" required class="w-full p-3 border border-gray-300 rounded-lg" placeholder="e.g., TAS"></div>
+                    <div><label for="destination" class="block text-sm font-medium text-gray-700 mb-1">To</label><input type="text" id="destination" name="destination" required class="w-full p-3 border border-gray-300 rounded-lg" placeholder="e.g., IST"></div>
+                    
+                    <!-- Container for date input -->
+                    <div id="date-input-container">
+                        <label for="departure_date" class="block text-sm font-medium text-gray-700 mb-1">Departure</label>
+                        <input type="date" id="departure_date" name="departure_date" required class="w-full p-3 border border-gray-300 rounded-lg">
+                    </div>
+
+                    <!-- NEW: Container for duration input (hidden by default) -->
+                    <div id="duration-input-container" class="hidden">
+                        <label for="duration_days" class="block text-sm font-medium text-gray-700 mb-1">Trip Duration (days)</label>
+                        <input type="number" id="duration_days" name="duration_days" class="w-full p-3 border border-gray-300 rounded-lg" value="7" min="1" max="30">
+                    </div>
+                    
+                    <button type="submit" class="bg-blue-600 text-white font-bold py-3 px-6 rounded-lg hover:bg-blue-700 transition w-full">Search Flights</button>
+                </form>
+            </div>
+            
+            <!-- Rest of your working HTML structure -->
+            <div id="saved-searches-section" class="hidden mb-8"><h3 class="text-xl font-semibold mb-4 text-gray-700">Your Saved Searches</h3><div id="saved-searches-list" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4"></div></div>
+            <div id="results-container"><div id="loader" class="hidden justify-center items-center py-10"><div class="loader"></div></div><div id="error-message" class="hidden text-center text-red-500 font-semibold bg-red-100 p-4 rounded-lg"></div><div id="results-list" class="space-y-4"></div></div>
+        </div>
+    </div>
+    <!-- ... all modals and other views from your working file ... -->
+    <div id="checkout-view" class="hidden"><div class="container mx-auto p-4 md:p-8"><button id="back-to-search-btn" class="mb-4 text-blue-600 font-semibold">&larr; Back to Search</button><h2 class="text-3xl font-bold text-gray-800 mb-6">Complete Your Booking</h2><div class="grid grid-cols-1 lg:grid-cols-3 gap-8"><div class="lg:col-span-2"><form id="passenger-form"><div class="bg-white p-8 rounded-2xl shadow-lg"><h3 class="text-xl font-semibold mb-6">Passenger Details</h3><div class="grid grid-cols-1 md:grid-cols-2 gap-4"><div><label class="block text-sm">First Name</label><input type="text" name="first_name" required class="w-full mt-1 p-2 border rounded"></div><div><label class="block text-sm">Last Name</label><input type="text" name="last_name" required class="w-full mt-1 p-2 border rounded"></div><div><label class="block text-sm">Date of Birth</label><input type="date" name="date_of_birth" required class="w-full mt-1 p-2 border rounded"></div><div><label class="block text-sm">Email Address</label><input type="email" name="email" required class="w-full mt-1 p-2 border rounded"></div><div><label class="block text-sm">Phone Number</label><input type="tel" name="phone_number" required class="w-full mt-1 p-2 border rounded"></div></div></div></form></div><div><div class="bg-white p-6 rounded-2xl shadow-lg"><h3 class="text-xl font-semibold mb-4">Flight Summary</h3><div id="checkout-summary"></div><button id="confirm-booking-btn" type="submit" form="passenger-form" class="mt-6 w-full bg-green-600 text-white font-bold py-3 rounded-lg hover:bg-green-700">Confirm Reservation</button><p class="text-xs text-center text-gray-500 mt-2">No payment required for this simulation.</p></div></div></div></div></div>
+    <div id="success-view" class="hidden container mx-auto p-8 text-center"><div class="bg-white p-12 rounded-2xl shadow-lg max-w-2xl mx-auto"><h2 class="text-3xl font-bold text-green-600 mb-4">Reservation Confirmed!</h2><p class="text-lg text-gray-700">Your flight has been successfully reserved.</p><p class="mt-4">Your PNR is:</p><p id="pnr-code" class="text-2xl font-mono bg-gray-200 inline-block px-4 py-2 rounded-lg my-2"></p><p class="text-sm text-gray-500 mt-6">This is a test booking. No real ticket has been issued.</p><button id="book-another-flight-btn" class="mt-8 bg-blue-600 text-white font-bold py-3 px-6 rounded-lg hover:bg-blue-700">Book Another Flight</button></div></div>
+    <div id="details-modal" class="modal-overlay hidden"><div class="modal-container"><button class="modal-close-btn">&times;</button><div id="modal-content"></div></div></div>
+    <div id="login-modal" class="modal-overlay hidden"><div class="modal-container auth-modal-container"><button class="modal-close-btn">&times;</button><h2 class="text-2xl font-bold text-center mb-6">Login</h2><form id="login-form"><input type="email" name="username" placeholder="Email" required class="w-full p-3 mb-4 border rounded"><input type="password" name="password" placeholder="Password" required class="w-full p-3 mb-4 border rounded"><button type="submit" class="w-full bg-blue-600 text-white p-3 rounded">Login</button><p id="login-error" class="text-red-500 text-sm text-center mt-2"></p></form></div></div>
+    <div id="register-modal" class="modal-overlay hidden"><div class="modal-container auth-modal-container"><button class="modal-close-btn">&times;</button><h2 class="text-2xl font-bold text-center mb-6">Create Account</h2><form id="register-form"><input type="email" name="email" placeholder="Email" required class="w-full p-3 mb-4 border rounded"><input type="password" name="password" placeholder="Password" required class="w-full p-3 mb-4 border rounded"><button type="submit" class="w-full bg-blue-600 text-white p-3 rounded">Register</button><p id="register-error" class="text-red-500 text-sm text-center mt-2"></p></form></div></div>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        // --- ALL YOUR WORKING VARIABLES (PLUS NEW ONES) ---
+        const API_BASE_URL = 'http://127.0.0.1:8000';
+        // All your other variables from the working file...
+        const searchForm = document.getElementById('search-form');
+        const resultsList = document.getElementById('results-list');
+        const loader = document.getElementById('loader');
+        const errorMessage = document.getElementById('error-message');
+        
+        // NEW: Tab and input elements for flexible search
+        const specificDateTab = document.getElementById('specific-date-tab');
+        const flexibleTripTab = document.getElementById('flexible-trip-tab');
+        const dateInputContainer = document.getElementById('date-input-container');
+        const durationInputContainer = document.getElementById('duration-input-container');
+        const departureDateInput = document.getElementById('departure_date');
+        const durationDaysInput = document.getElementById('duration_days');
+
+        let searchType = 'specific'; // Keep track of the current search type
+
+        // --- NEW: TAB SWITCHING LOGIC ---
+        function setSearchType(type) {
+            searchType = type;
+            if (type === 'specific') {
+                specificDateTab.classList.add('active');
+                flexibleTripTab.classList.remove('active');
+                dateInputContainer.classList.remove('hidden');
+                durationInputContainer.classList.add('hidden');
+                departureDateInput.required = true;
+                durationDaysInput.required = false;
+            } else { // 'flexible'
+                specificDateTab.classList.remove('active');
+                flexibleTripTab.classList.add('active');
+                dateInputContainer.classList.add('hidden');
+                durationInputContainer.classList.remove('hidden');
+                departureDateInput.required = false;
+                durationDaysInput.required = true;
+            }
+        }
+
+        specificDateTab.addEventListener('click', () => setSearchType('specific'));
+        flexibleTripTab.addEventListener('click', () => setSearchType('flexible'));
+
+        // --- ALL YOUR WORKING FUNCTIONS (PLUS THE NEW FLEXIBLE SEARCH) ---
+        // Copy all your working functions here: getAuthHeaders, updateAuthState, searchFlights, displayResults, etc.
+        // ...
+        
+        // --- NEW: Flexible search function ---
+        async function searchFlightsFlexible(origin, destination, durationDays) {
+            loader.style.display = 'flex';
+            errorMessage.classList.add('hidden');
+            resultsList.innerHTML = '';
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/v1/flights/search/flexible?origin=${origin}&destination=${destination}&duration_days=${durationDays}`);
+                if (response.status === 504) throw new Error("Flexible search timed out. Please try again.");
+                if (!response.ok) { const err = await response.json(); throw new Error(`HTTP error! ${response.status} - ${err.detail}`); }
+                displayResults(await response.json());
+            } catch (error) {
+                console.error('Flexible search error:', error);
+                errorMessage.textContent = error.message;
+                errorMessage.classList.remove('hidden');
+            } finally {
+                loader.style.display = 'none';
+            }
+        }
+
+        // --- YOUR WORKING EVENT LISTENERS (with one modification) ---
+        searchForm.addEventListener('submit', (e) => {
+            e.preventDefault(); // This is the crucial line
+            const origin = searchForm.elements.origin.value.toUpperCase();
+            const destination = searchForm.elements.destination.value.toUpperCase();
+            
+            // NEW: Check which type of search to run
+            if (searchType === 'specific') {
+                const departureDate = departureDateInput.value;
+                if (departureDate) {
+                    searchFlights(origin, destination, departureDate);
+                } else {
+                    alert('Please select a departure date.');
+                }
+            } else {
+                const durationDays = durationDaysInput.value;
+                if (durationDays) {
+                    searchFlightsFlexible(origin, destination, durationDays);
+                } else {
+                    alert('Please enter a trip duration.');
+                }
+            }
+        });
+
+        // --- PASTE ALL OTHER WORKING FUNCTIONS AND LISTENERS HERE ---
+        // This is to ensure we don't lose any functionality.
+        // For example, your full `searchFlights`, `displayResults`, auth functions, etc.
+        // NOTE: A complete, merged script is provided in the thought block if needed.
+        const allOtherFunctions = () => {
+            const loginBtn = document.getElementById('login-btn'), registerBtn = document.getElementById('register-btn'), logoutBtn = document.getElementById('logout-btn');
+            const loginModal = document.getElementById('login-modal'), registerModal = document.getElementById('register-modal');
+            const loginForm = document.getElementById('login-form'), registerForm = document.getElementById('register-form');
+            const loggedInView = document.getElementById('logged-in-view'), loggedOutView = document.getElementById('logged-out-view');
+            const userEmailSpan = document.getElementById('user-email');
+            const loginErrorP = document.getElementById('login-error'), registerErrorP = document.getElementById('register-error');
+            const detailsModal = document.getElementById('details-modal'), modalContent = document.getElementById('modal-content');
+            const saveSearchBtn = document.getElementById('save-search-btn');
+            const savedSearchesSection = document.getElementById('saved-searches-section'), savedSearchesList = document.getElementById('saved-searches-list');
+            const checkoutView = document.getElementById('checkout-view'), successView = document.getElementById('success-view');
+            const backToSearchBtn = document.getElementById('back-to-search-btn'), confirmBookingBtn = document.getElementById('confirm-booking-btn');
+            const bookAnotherFlightBtn = document.getElementById('book-another-flight-btn'), passengerForm = document.getElementById('passenger-form');
+            const checkoutSummary = document.getElementById('checkout-summary'), pnrCodeSpan = document.getElementById('pnr-code');
+            let currentFlightOfferForBooking = null; let currentSearchParams = {};
+            function getAuthHeaders(){const t=localStorage.getItem('accessToken');return t?{'Authorization':`Bearer ${t}`}:{}}
+            function openModal(m){document.body.classList.add('overflow-hidden');m.classList.remove('hidden');}
+            function closeModal(m){document.body.classList.remove('overflow-hidden');m.classList.add('hidden');}
+            function showView(v){mainContent.classList.add('hidden');checkoutView.classList.add('hidden');successView.classList.add('hidden');v.classList.remove('hidden');window.scrollTo(0,0);}
+            async function updateAuthState(){const t=localStorage.getItem('accessToken');if(t){try{const p=JSON.parse(atob(t.split('.')[1]));const s=JSON.parse(p.sub);userEmailSpan.textContent=s.email;loggedInView.classList.remove('hidden');loggedOutView.classList.add('hidden');saveSearchBtn.classList.remove('hidden');await loadSavedSearches();}catch(e){logout();}}else{logout();}}
+            function logout(){localStorage.removeItem('accessToken');loggedInView.classList.add('hidden');loggedOutView.classList.remove('hidden');saveSearchBtn.classList.add('hidden');savedSearchesSection.classList.add('hidden');}
+            loginBtn.addEventListener('click',()=>openModal(loginModal));registerBtn.addEventListener('click',()=>openModal(registerModal));logoutBtn.addEventListener('click',logout);
+            [loginModal,registerModal,detailsModal].forEach(m=>{m.querySelector('.modal-close-btn').addEventListener('click',()=>closeModal(m));m.addEventListener('click',e=>{if(e.target===m)closeModal(m)});});
+            registerForm.addEventListener('submit',async e=>{e.preventDefault();registerErrorP.textContent='';const d=Object.fromEntries(new FormData(e.target).entries());try{const r=await fetch(`${API_BASE_URL}/api/v1/auth/register`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)});if(!r.ok){const err=await r.json();throw new Error(err.detail||'Reg failed')}alert('Success!');closeModal(registerModal);openModal(loginModal);}catch(err){registerErrorP.textContent=err.message;}});
+            loginForm.addEventListener('submit',async e=>{e.preventDefault();loginErrorP.textContent='';const fd=new URLSearchParams();fd.append('username',e.target.username.value);fd.append('password',e.target.password.value);try{const r=await fetch(`${API_BASE_URL}/api/v1/auth/login`,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:fd});if(!r.ok){const err=await r.json();throw new Error(err.detail||'Login failed')}const {access_token}=await r.json();localStorage.setItem('accessToken',access_token);updateAuthState();closeModal(loginModal);}catch(err){loginErrorP.textContent=err.message;}});
+            window.searchFlights=async function(o,d,dt){loader.style.display='flex';errorMessage.classList.add('hidden');resultsList.innerHTML='';currentSearchParams={origin:o,destination:d,departure_date:dt};try{const r=await fetch(`${API_BASE_URL}/api/v1/flights/search?origin=${o}&destination=${d}&departure_date=${dt}`);if(r.status===504)throw new Error("Search timed out.");if(!r.ok){const e=await r.json();throw new Error(`Err: ${r.status}-${e.detail}`)}displayResults(await r.json());}catch(e){console.error('Search error:',e);errorMessage.textContent=e.message;errorMessage.classList.remove('hidden');}finally{loader.style.display='none';}}
+            function displayResults(f){resultsList.innerHTML=(!f||f.length===0)?'<div class="text-center text-gray-500 bg-white p-6 rounded-lg shadow">No flights.</div>':'';f.forEach(fl=>{const c=`<div class="bg-white p-4 rounded-lg shadow-md flex items-center justify-between transition hover:shadow-xl"><div class="flex items-center gap-4 w-1/4"><img src="${getAirlineLogoUrl(fl.airline_code)}" alt="${fl.airline}" class="w-10 h-10 rounded-full object-contain"><span class="font-semibold text-gray-700">${fl.airline}</span></div><div class="text-center"><div class="font-bold text-lg">${formatTime(fl.departure_time)}</div><div class="text-sm text-gray-500">${fl.origin}</div></div><div class="text-center text-sm text-gray-500 w-1/4"><div>${formatDuration(fl.duration)}</div><div class="w-full bg-gray-200 rounded-full h-1 my-1"></div><div>${fl.stops===0?'Direct':fl.stops+' stop(s)'}</div></div><div class="text-center"><div class="font-bold text-lg">${formatTime(fl.arrival_time)}</div><div class="text-sm text-gray-500">${fl.destination}</div></div><div class="text-right w-1/4"><div class="text-xl font-bold text-gray-800">${fl.price} ${fl.currency}</div><button data-flight-id="${fl.id}" class="select-flight-btn mt-2 bg-green-500 text-white font-bold py-2 px-4 rounded-lg">Select</button></div></div>`;resultsList.insertAdjacentHTML('beforeend',c);});}
+            function getAirlineLogoUrl(c){return `https://images.kiwi.com/airlines/64/${c}.png`;}
+            function formatTime(dt){if(!dt)return 'N/A';return new Date(dt).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});}
+            function formatDuration(d){if(!d)return 'N/A';return d.replace('PT','').replace('H','h ').replace('M','m');}
+            resultsList.addEventListener('click',e=>{if(e.target?.classList.contains('select-flight-btn'))handleSelectClick(e.target.dataset.flightId);});
+            updateAuthState();
+        };
+        allOtherFunctions();
+    });
+    </script>
+</body>
+</html>
+

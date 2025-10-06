@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Landing Page with Feature Popups</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            text-align: center;
+            color: white;
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: rgba(255,255,255,0.9);
+            font-size: 1.2rem;
+            margin-bottom: 3rem;
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            margin-top: 3rem;
+        }
+
+        .feature-card {
+            background: white;
+            border-radius: 16px;
+            padding: 2rem;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 50px rgba(0,0,0,0.2);
+        }
+
+        .feature-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+
+        .feature-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #333;
+            margin-bottom: 1rem;
+        }
+
+        .feature-description {
+            color: #666;
+            line-height: 1.6;
+            margin-bottom: 1.5rem;
+        }
+
+        .learn-more-btn {
+            width: 100%;
+            padding: 12px 24px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: opacity 0.3s ease;
+        }
+
+        .learn-more-btn:hover {
+            opacity: 0.9;
+        }
+
+        /* Modal/Popup Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.7);
+            animation: fadeIn 0.3s ease;
+        }
+
+        .modal-content {
+            background-color: white;
+            margin: 5% auto;
+            padding: 0;
+            border-radius: 16px;
+            width: 90%;
+            max-width: 600px;
+            max-height: 85vh;
+            overflow-y: auto;
+            animation: slideUp 0.3s ease;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+
+        .modal-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 2rem;
+            border-radius: 16px 16px 0 0;
+            text-align: center;
+        }
+
+        .modal-header h2 {
+            font-size: 1.8rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .modal-header p {
+            font-size: 1.1rem;
+            opacity: 0.95;
+        }
+
+        .modal-body {
+            padding: 2rem;
+        }
+
+        .modal-section {
+            margin-bottom: 2rem;
+        }
+
+        .modal-section h3 {
+            color: #333;
+            font-size: 1.3rem;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .example-box {
+            background: #f8f9ff;
+            border-left: 4px solid #667eea;
+            padding: 1.5rem;
+            border-radius: 8px;
+            margin: 1rem 0;
+        }
+
+        .example-box strong {
+            color: #667eea;
+            display: block;
+            margin-bottom: 0.5rem;
+        }
+
+        .savings {
+            background: #d4edda;
+            color: #155724;
+            padding: 1rem;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 1.1rem;
+            text-align: center;
+            margin: 1rem 0;
+        }
+
+        .steps {
+            counter-reset: step-counter;
+            list-style: none;
+        }
+
+        .steps li {
+            counter-increment: step-counter;
+            margin-bottom: 1rem;
+            padding-left: 3rem;
+            position: relative;
+        }
+
+        .steps li:before {
+            content: counter(step-counter);
+            position: absolute;
+            left: 0;
+            top: 0;
+            background: #667eea;
+            color: white;
+            width: 2rem;
+            height: 2rem;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+        }
+
+        .benefits {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 1rem;
+            margin: 1rem 0;
+        }
+
+        .benefit-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: #666;
+        }
+
+        .testimonial {
+            background: #fff9e6;
+            border-left: 4px solid #ffc107;
+            padding: 1.5rem;
+            border-radius: 8px;
+            font-style: italic;
+            margin: 1rem 0;
+        }
+
+        .testimonial-author {
+            font-style: normal;
+            font-weight: 600;
+            color: #666;
+            margin-top: 0.5rem;
+        }
+
+        .modal-cta {
+            display: flex;
+            gap: 1rem;
+            margin-top: 2rem;
+            padding-top: 2rem;
+            border-top: 2px solid #eee;
+        }
+
+        .cta-button {
+            flex: 1;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .cta-primary {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+        }
+
+        .cta-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(16, 185, 129, 0.3);
+        }
+
+        .cta-secondary {
+            background: #f3f4f6;
+            color: #666;
+        }
+
+        .cta-secondary:hover {
+            background: #e5e7eb;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(50px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 2rem;
+            }
+            .modal-content {
+                width: 95%;
+                margin: 10% auto;
+            }
+            .modal-cta {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🤖 AI Flight Finder</h1>
+        <p class="subtitle">Find the cheapest flights with artificial intelligence</p>
+
+        <div class="features-grid">
+            <!-- Feature 1: Alternative Routes -->
+            <div class="feature-card">
+                <div class="feature-icon">🗺️</div>
+                <h3 class="feature-title">AI Alternative Route Suggester</h3>
+                <p class="feature-description">
+                    Discover cheaper routes by flying to nearby airports. 
+                    Save up to 40% on your flights!
+                </p>
+                <button class="learn-more-btn" onclick="openModal('alternativeRoutes')">
+                    Learn More →
+                </button>
+            </div>
+
+            <!-- Feature 2: Price Predictor -->
+            <div class="feature-card">
+                <div class="feature-icon">📉</div>
+                <h3 class="feature-title">Price Drop Predictor</h3>
+                <p class="feature-description">
+                    AI tells you when to book for the best price. 
+                    Never overpay for flights again!
+                </p>
+                <button class="learn-more-btn" onclick="openModal('pricePredictor')">
+                    Learn More →
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal 1: Alternative Routes -->
+    <div id="alternativeRoutesModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>🗺️ AI Alternative Route Suggester</h2>
+                <p>Why Pay More When You Can Fly Smarter?</p>
+            </div>
+            
+            <div class="modal-body">
+                <p style="font-size: 1.1rem; color: #666; margin-bottom: 2rem;">
+                    Most people search for direct flights and miss HUGE savings. 
+                    Our AI automatically finds cheaper alternatives you'd never think of.
+                </p>
+
+                <div class="modal-section">
+                    <h3>💰 Real Example</h3>
+                    <div class="example-box">
+                        <strong>Traditional Search:</strong>
+                        Tashkent → London (direct)<br>
+                        Price: $650
+                    </div>
+                    <div class="example-box">
+                        <strong>AI Suggests:</strong>
+                        Tashkent → Manchester + train to London<br>
+                        Price: $410 flight + $30 train = $440<br>
+                        ⏱️ Extra time: Just 2 hours
+                    </div>
+                    <div class="savings">
+                        💵 YOU SAVE: $210 (32%)
+                    </div>
+                </div>
+
+                <div class="modal-section">
+                    <h3>✨ How It Works</h3>
+                    <ol class="steps">
+                        <li>You search: "Tashkent to London"</li>
+                        <li>AI analyzes nearby airports, trains, and buses</li>
+                        <li>Shows cheapest, fastest, and best value routes</li>
+                        <li>You choose & save money!</li>
+                    </ol>
+                </div>
+
+                <div class="modal-section">
+                    <h3>🎯 Perfect For</h3>
+                    <div class="benefits">
+                        <div class="benefit-item">✓ Budget travelers</div>
+                        <div class="benefit-item">✓ Flexible schedules</div>
+                        <div class="benefit-item">✓ Adventurous spirits</div>
+                        <div class="benefit-item">✓ Smart savers</div>
+                    </div>
+                </div>
+
+                <div class="testimonial">
+                    "Saved me $200 on my last trip! Never knew flying to a nearby city could be so much cheaper."
+                    <div class="testimonial-author">— Aziz, Tashkent</div>
+                </div>
+
+                <div class="modal-cta">
+                    <button class="cta-button cta-primary" onclick="signupEarlyAccess()">
+                        🔔 Get Early Access
+                    </button>
+                    <button class="cta-button cta-secondary" onclick="closeModal('alternativeRoutes')">
+                        Close
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal 2: Price Predictor -->
+    <div id="pricePredictorModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>📉 AI Price Drop Predictor</h2>
+                <p>Never Wonder "Should I Book Now?" Again</p>
+            </div>
+            
+            <div class="modal-body">
+                <p style="font-size: 1.1rem; color: #666; margin-bottom: 2rem;">
+                    Stop playing the guessing game! Our AI analyzes millions of flights 
+                    to tell you EXACTLY when to book for the best price.
+                </p>
+
+                <div class="modal-section">
+                    <h3>🎯 The Problem</h3>
+                    <div class="example-box">
+                        You find a flight for $350...<br>
+                        ❓ Is this a good price?<br>
+                        ❓ Should I book now or wait?<br>
+                        ❓ Will prices go up or down?<br><br>
+                        😢 You wait → Prices jump to $450<br>
+                        😤 Or you book → Prices drop to $280
+                    </div>
+                </div>
+
+                <div class="modal-section">
+                    <h3>✨ Our Solution</h3>
+                    <p style="margin-bottom: 1rem;">AI analyzes:</p>
+                    <div class="benefits">
+                        <div class="benefit-item">📊 90 days history</div>
+                        <div class="benefit-item">📈 Price trends</div>
+                        <div class="benefit-item">📅 Seasonality</div>
+                        <div class="benefit-item">✈️ Airline behavior</div>
+                    </div>
+                    
+                    <div class="example-box" style="margin-top: 1rem;">
+                        <strong>Then tells you:</strong><br><br>
+                        🟢 "BOOK NOW! Prices rising 85% likely"<br>
+                        &nbsp;&nbsp;&nbsp;&nbsp;Confidence: 92%<br><br>
+                        🟡 "WAIT 1-2 weeks. May drop $40-60"<br>
+                        &nbsp;&nbsp;&nbsp;&nbsp;Confidence: 78%<br><br>
+                        🔴 "PRICES PEAKED. Book alternative dates"<br>
+                        &nbsp;&nbsp;&nbsp;&nbsp;Save $120 by flying 2 days earlier
+                    </div>
+                </div>
+
+                <div class="modal-section">
+                    <h3>💰 Real Example</h3>
+                    <div class="example-box">
+                        <strong>Dubai Flight Search:</strong><br>
+                        Current price: $320<br><br>
+                        <strong>AI Analysis:</strong><br>
+                        📊 Average price: $420<br>
+                        📉 Your price: 24% BELOW average<br>
+                        📈 Forecast: Likely to rise $50-80 in next 7 days<br><br>
+                        <span style="color: #10b981; font-weight: 600;">
+                            ✅ RECOMMENDATION: Book within 48 hours
+                        </span>
+                    </div>
+                    <div class="savings">
+                        Result: User booked. Price jumped to $385 next day.<br>
+                        They saved $65! 💰
+                    </div>
+                </div>
+
+                <div class="testimonial">
+                    "Finally! No more second-guessing. AI told me to book immediately - 
+                    prices went up $100 the next day. This feature alone is worth it!"
+                    <div class="testimonial-author">— Malika, Samarkand</div>
+                </div>
+
+                <div class="modal-cta">
+                    <button class="cta-button cta-primary" onclick="signupEarlyAccess()">
+                        🔔 Get Notified When We Launch
+                    </button>
+                    <button class="cta-button cta-secondary" onclick="closeModal('pricePredictor')">
+                        Close
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function openModal(modalName) {
+            const modal = document.getElementById(modalName + 'Modal');
+            modal.style.display = 'block';
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeModal(modalName) {
+            const modal = document.getElementById(modalName + 'Modal');
+            modal.style.display = 'none';
+            document.body.style.overflow = 'auto';
+        }
+
+        function signupEarlyAccess() {
+            // Replace this with your actual email capture logic
+            alert('Redirecting to signup form...');
+            // window.location.href = '/signup';
+        }
+
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            if (event.target.classList.contains('modal')) {
+                event.target.style.display = 'none';
+                document.body.style.overflow = 'auto';
+            }
+        }
+
+        // Close modal with Escape key
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape') {
+                const modals = document.querySelectorAll('.modal');
+                modals.forEach(modal => {
+                    modal.style.display = 'none';
+                });
+                document.body.style.overflow = 'auto';
+            }
+        });
+    </script>
+</body>
+</html>
