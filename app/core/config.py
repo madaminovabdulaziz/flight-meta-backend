@@ -1,7 +1,8 @@
 # app/core/config.py
 import os
 from typing import List
-from pydantic_settings import BaseSettings
+from pydantic import Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
 import secrets
 from dotenv import load_dotenv
 
@@ -34,6 +35,7 @@ class Settings(BaseSettings):
     
     # --- Redis ---
     REDIS_URI: str
+    REDIS_URL: str = Field(default="redis://localhost:6379/0", env="REDIS_URL")
 
     CELERY_BROKER_URL: str
     CELERY_RESULT_BACKEND: str
@@ -104,6 +106,11 @@ class Settings(BaseSettings):
         case_sensitive = True
         env_file = ".env"
         env_file_encoding = "utf-8"
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        case_sensitive=True
+    )
 
 settings = Settings()
 
