@@ -1,0 +1,969 @@
+import React, { useState, useEffect } from 'react';
+import { Calendar, TrendingDown, Plane, X, AlertCircle, DollarSign } from 'lucide-react';
+
+// Mock data - replace with actual API call
+const mockCheapFlightsData = {
+  origin: "TAS",
+  destination: "IST",
+  origin_city: "Tashkent",
+  origin_country: "Uzbekistan",
+  destination_city: "Istanbul",
+  destination_country: "Turkey",
+  currency: "USD",
+  currency_symbol: "$",
+  average: 278,
+  cheapest: {
+    date: "2025-10-15",
+    price: 247,
+    airline: "TK",
+    number_of_changes: 0,
+    return_date: "2025-10-22"
+  },
+  prices: [
+    { date: "2025-10-12", price: 289, airline: "TK", number_of_changes: 0 },
+    { date: "2025-10-15", price: 247, airline: "TK", number_of_changes: 0 },
+    { date: "2025-10-18", price: 312, airline: "HY", number_of_changes: 1 },
+    { date: "2025-10-22", price: 268, airline: "TK", number_of_changes: 0 },
+    { date: "2025-10-25", price: 295, airline: "PS", number_of_changes: 1 },
+    { date: "2025-10-28", price: 278, airline: "TK", number_of_changes: 0 },
+    { date: "2025-11-01", price: 255, airline: "TK", number_of_changes: 0 },
+    { date: "2025-11-05", price: 299, airline: "HY", number_of_changes: 0 },
+    { date: "2025-11-08", price: 278, airline: "TK", number_of_changes: 1 },
+    { date: "2025-11-12", price: 310, airline: "TK", number_of_changes: 0 },
+    { date: "2025-11-15", price: 289, airline: "PS", number_of_changes: 1 },
+    { date: "2025-11-18", price: 325, airline: "TK", number_of_changes: 0 },
+    { date: "2025-11-22", price: 342, airline: "HY", number_of_changes: 1 },
+    { date: "2025-11-25", price: 298, airline: "TK", number_of_changes: 0 },
+    { date: "2025-11-28", price: 315, airline: "TK", number_of_changes: 0 },
+    { date: "2025-12-01", price: 288, airline: "PS", number_of_changes: 1 },
+    { date: "2025-12-05", price: 275, airline: "TK", number_of_changes: 0 },
+    { date: "2025-12-08", price: 292, airline: "HY", number_of_changes: 0 },
+  ],
+  count: 18
+};
+
+const PriceCalendarModal = ({ isOpen, onClose, routeData }) => {
+  const [selectedDate, setSelectedDate] = useState(null);
+  const [flightData, setFlightData] = useState(mockCheapFlightsData);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (isOpen && routeData) {
+      fetchCheapFlights();
+    }
+  }, [isOpen, routeData]);
+
+  const fetchCheapFlights = async () => {
+    setLoading(true);
+    try {
+      // Replace with actual API call
+      // const response = await fetch(`/api/v1/cheap-flights?origin=${routeData.origin}&destination=${routeData.destination}`);
+      // const data = await response.json();
+      // setFlightData(data);
+      
+      // Simulate API delay
+      await new Promise(resolve => setTimeout(resolve, 800));
+      setFlightData(mockCheapFlightsData);
+    } catch (error) {
+      console.error('Error fetching cheap flights:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getPriceClass = (price) => {
+    const prices = flightData.prices.map(p => p.price);
+    const minPrice = Math.min(...prices);
+    const maxPrice = Math.max(...prices);
+    const percentile = (price - minPrice) / (maxPrice - minPrice);
+    
+    if (percentile < 0.25) return 'best';
+    if (percentile < 0.5) return 'good';
+    if (percentile < 0.75) return 'average';
+    return 'expensive';
+  };
+
+  const getPriceLabel = (priceClass) => {
+    const labels = {
+      best: '🔥 Best Deal',
+      good: '👍 Good Price',
+      average: '💼 Average',
+      expensive: '📈 Higher'
+    };
+    return labels[priceClass] || '';
+  };
+
+  const formatDate = (dateStr) => {
+    const date = new Date(dateStr);
+    return {
+      dayName: date.toLocaleDateString('en-US', { weekday: 'short' }),
+      dayOfMonth: date.getDate(),
+      month: date.toLocaleDateString('en-US', { month: 'short' }),
+      fullDate: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+    };
+  };
+
+  const groupByMonth = () => {
+    const grouped = {};
+    flightData.prices.forEach(price => {
+      const date = new Date(price.date);
+      const monthKey = date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+      if (!grouped[monthKey]) {
+        grouped[monthKey] = [];
+      }
+      grouped[monthKey].push(price);
+    });
+    return grouped;
+  };
+
+  const handleDateSelect = (dateInfo) => {
+    setSelectedDate(dateInfo);
+  };
+
+  const handleSearchFlights = () => {
+    if (selectedDate) {
+      // Navigate to search with selected date
+      console.log('Searching flights for:', selectedDate.date);
+      // window.location.href = `/search?origin=${flightData.origin}&destination=${flightData.destination}&date=${selectedDate.date}`;
+      alert(`Searching flights for ${selectedDate.date}`);
+    }
+  };
+
+  if (!isOpen) return null;
+
+  const prices = flightData.prices.map(p => p.price);
+  const minPrice = Math.min(...prices);
+  const maxPrice = Math.max(...prices);
+  const savings = maxPrice - minPrice;
+
+  return (
+    <div style={styles.overlay} onClick={onClose}>
+      <div style={styles.modal} onClick={(e) => e.stopPropagation()}>
+        {/* Header */}
+        <div style={styles.header}>
+          <button style={styles.closeBtn} onClick={onClose}>
+            <X size={24} />
+          </button>
+          <div style={styles.routeInfo}>
+            <h2 style={styles.routeTitle}>
+              ✈️ {flightData.origin} → {flightData.destination}
+            </h2>
+            <p style={styles.routeSubtitle}>
+              {flightData.origin_city} → {flightData.destination_city} · Best prices for next 60 days
+            </p>
+          </div>
+        </div>
+
+        {loading ? (
+          <div style={styles.loadingContainer}>
+            <div style={styles.spinner}></div>
+            <p>Loading best prices...</p>
+          </div>
+        ) : (
+          <>
+            {/* Best Deal Alert */}
+            <div style={styles.bestDealBanner}>
+              <div style={styles.dealIcon}>🔥</div>
+              <div style={styles.dealInfo}>
+                <h3 style={styles.dealTitle}>Cheapest Flight Found</h3>
+                <div style={styles.dealDetails}>
+                  <span style={styles.dealPrice}>
+                    {flightData.currency_symbol}{flightData.cheapest.price}
+                  </span>
+                  <span style={styles.dealBadge}>
+                    {flightData.cheapest.number_of_changes === 0 ? '✈ Direct' : `${flightData.cheapest.number_of_changes} stop(s)`}
+                  </span>
+                  <span style={styles.dealDate}>
+                    {formatDate(flightData.cheapest.date).fullDate}
+                  </span>
+                </div>
+              </div>
+              <button 
+                style={styles.dealCta}
+                onClick={() => handleDateSelect(flightData.cheapest)}
+              >
+                Select This Date →
+              </button>
+            </div>
+
+            {/* Price Trend Mini Chart */}
+            <div style={styles.trendSection}>
+              <div style={styles.trendHeader}>
+                <TrendingDown size={20} style={{ color: '#10b981' }} />
+                <h3 style={styles.trendTitle}>Price Trends</h3>
+              </div>
+              <div style={styles.miniChart}>
+                {flightData.prices.slice(0, 12).map((priceData, idx) => {
+                  const height = ((priceData.price - minPrice) / (maxPrice - minPrice)) * 100;
+                  const priceClass = getPriceClass(priceData.price);
+                  return (
+                    <div key={idx} style={styles.barContainer}>
+                      <div 
+                        style={{
+                          ...styles.priceBar,
+                          height: `${Math.max(height, 20)}%`,
+                          background: {
+                            best: 'linear-gradient(180deg, #10b981, #059669)',
+                            good: 'linear-gradient(180deg, #fbbf24, #f59e0b)',
+                            average: 'linear-gradient(180deg, #fb923c, #f97316)',
+                            expensive: 'linear-gradient(180deg, #ef4444, #dc2626)'
+                          }[priceClass]
+                        }}
+                      >
+                        <span style={styles.barPrice}>${priceData.price}</span>
+                      </div>
+                      <span style={styles.barDate}>{formatDate(priceData.date).dayOfMonth}</span>
+                    </div>
+                  );
+                })}
+              </div>
+              <div style={styles.legend}>
+                <span style={styles.legendItem}>
+                  <div style={{...styles.colorBox, background: '#10b981'}}></div> Best
+                </span>
+                <span style={styles.legendItem}>
+                  <div style={{...styles.colorBox, background: '#fbbf24'}}></div> Good
+                </span>
+                <span style={styles.legendItem}>
+                  <div style={{...styles.colorBox, background: '#fb923c'}}></div> Average
+                </span>
+                <span style={styles.legendItem}>
+                  <div style={{...styles.colorBox, background: '#ef4444'}}></div> Higher
+                </span>
+              </div>
+            </div>
+
+            {/* Date Selection Calendar */}
+            <div style={styles.dateSelector}>
+              <div style={styles.selectorHeader}>
+                <Calendar size={20} style={{ color: '#6366f1' }} />
+                <h3 style={styles.selectorTitle}>Select Your Travel Date</h3>
+              </div>
+              
+              <div style={styles.calendarView}>
+                {Object.entries(groupByMonth()).map(([month, dates]) => (
+                  <div key={month} style={styles.monthSection}>
+                    <h4 style={styles.monthTitle}>{month}</h4>
+                    <div style={styles.datesGrid}>
+                      {dates.map((dateInfo) => {
+                        const priceClass = getPriceClass(dateInfo.price);
+                        const isSelected = selectedDate?.date === dateInfo.date;
+                        const isCheapest = dateInfo.date === flightData.cheapest.date;
+                        const formatted = formatDate(dateInfo.date);
+                        
+                        return (
+                          <button
+                            key={dateInfo.date}
+                            style={{
+                              ...styles.dateCard,
+                              ...(isSelected ? styles.dateCardSelected : {}),
+                              ...(isCheapest ? styles.dateCardCheapest : {})
+                            }}
+                            onClick={() => handleDateSelect(dateInfo)}
+                          >
+                            {isCheapest && <div style={styles.cheapestFlag}>🔥 Best</div>}
+                            {isSelected && <div style={styles.selectedCheck}>✓</div>}
+                            
+                            <div style={styles.dateHeader}>
+                              <span style={styles.dayName}>{formatted.dayName}</span>
+                              <span style={styles.dateNum}>{formatted.dayOfMonth}</span>
+                            </div>
+                            
+                            <div style={styles.priceInfo}>
+                              <span style={styles.priceAmount}>
+                                {flightData.currency_symbol}{dateInfo.price}
+                              </span>
+                              <span style={{
+                                ...styles.priceBadge,
+                                background: {
+                                  best: '#d1fae5',
+                                  good: '#fef3c7',
+                                  average: '#fed7aa',
+                                  expensive: '#fee2e2'
+                                }[priceClass],
+                                color: {
+                                  best: '#065f46',
+                                  good: '#92400e',
+                                  average: '#9a3412',
+                                  expensive: '#991b1b'
+                                }[priceClass]
+                              }}>
+                                {getPriceLabel(priceClass).split(' ')[0]}
+                              </span>
+                            </div>
+                            
+                            <div style={styles.flightDetails}>
+                              <span style={styles.airlineCode}>{dateInfo.airline}</span>
+                              <span style={styles.stops}>
+                                {dateInfo.number_of_changes === 0 ? '✈ Direct' : `${dateInfo.number_of_changes} stop`}
+                              </span>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Statistics Footer */}
+            <div style={styles.statsFooter}>
+              <div style={styles.statItem}>
+                <span style={styles.statLabel}>Average Price</span>
+                <span style={styles.statValue}>
+                  {flightData.currency_symbol}{flightData.average}
+                </span>
+              </div>
+              
+              <div style={styles.statItemHighlight}>
+                <DollarSign size={20} style={{ color: '#10b981' }} />
+                <div>
+                  <span style={styles.statLabel}>Potential Savings</span>
+                  <span style={{...styles.statValue, color: '#10b981', fontSize: '1.3rem'}}>
+                    Up to {flightData.currency_symbol}{savings}
+                  </span>
+                </div>
+              </div>
+              
+              <div style={styles.statItem}>
+                <span style={styles.statLabel}>Dates Analyzed</span>
+                <span style={styles.statValue}>{flightData.count} options</span>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div style={styles.modalActions}>
+              <button style={styles.btnSecondary} onClick={onClose}>
+                Maybe Later
+              </button>
+              
+              <button 
+                style={{
+                  ...styles.btnPrimary,
+                  ...(selectedDate ? {} : styles.btnDisabled)
+                }}
+                onClick={handleSearchFlights}
+                disabled={!selectedDate}
+              >
+                {selectedDate ? (
+                  <>
+                    <Plane size={20} />
+                    Search Flights for {formatDate(selectedDate.date).fullDate}
+                  </>
+                ) : (
+                  'Select a date to continue'
+                )}
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// Demo Component
+const App = () => {
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  return (
+    <div style={styles.app}>
+      <div style={styles.demoContainer}>
+        <h1 style={styles.demoTitle}>🎯 SkySearch AI - Price Calendar Demo</h1>
+        <p style={styles.demoSubtitle}>
+          Click the button below to see the interactive price calendar modal
+        </p>
+        
+        <div style={styles.hotRouteCard}>
+          <div style={styles.cardImage}>
+            <img 
+              src="https://images.unsplash.com/photo-1524231757912-21f4fe3a7200?w=400" 
+              alt="Istanbul"
+              style={styles.cardImageImg}
+            />
+          </div>
+          <div style={styles.cardContent}>
+            <h3 style={styles.cardTitle}>Tashkent → Istanbul</h3>
+            <div style={styles.cardPrice}>
+              <span style={styles.cardPriceAmount}>from $247</span>
+              <span style={styles.cardBadge}>🔥 Hot Deal</span>
+            </div>
+            <p style={styles.cardDetails}>Direct flights · Turkish Airlines</p>
+            <button 
+              style={styles.selectButton}
+              onClick={() => setIsModalOpen(true)}
+            >
+              View Price Calendar →
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <PriceCalendarModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        routeData={{ origin: 'TAS', destination: 'IST' }}
+      />
+    </div>
+  );
+};
+
+const styles = {
+  app: {
+    minHeight: '100vh',
+    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    padding: '40px 20px',
+    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+  },
+  demoContainer: {
+    maxWidth: '600px',
+    margin: '0 auto',
+    textAlign: 'center'
+  },
+  demoTitle: {
+    color: 'white',
+    fontSize: '2.5rem',
+    marginBottom: '10px',
+    fontWeight: '700'
+  },
+  demoSubtitle: {
+    color: 'rgba(255,255,255,0.9)',
+    fontSize: '1.1rem',
+    marginBottom: '40px'
+  },
+  hotRouteCard: {
+    background: 'white',
+    borderRadius: '16px',
+    overflow: 'hidden',
+    boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+    transition: 'transform 0.3s ease'
+  },
+  cardImage: {
+    width: '100%',
+    height: '200px',
+    overflow: 'hidden'
+  },
+  cardImageImg: {
+    width: '100%',
+    height: '100%',
+    objectFit: 'cover'
+  },
+  cardContent: {
+    padding: '24px'
+  },
+  cardTitle: {
+    fontSize: '1.5rem',
+    fontWeight: '600',
+    marginBottom: '12px',
+    color: '#1f2937'
+  },
+  cardPrice: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+    marginBottom: '8px'
+  },
+  cardPriceAmount: {
+    fontSize: '1.8rem',
+    fontWeight: '700',
+    color: '#10b981'
+  },
+  cardBadge: {
+    background: '#fef3c7',
+    color: '#92400e',
+    padding: '4px 12px',
+    borderRadius: '12px',
+    fontSize: '0.85rem',
+    fontWeight: '600'
+  },
+  cardDetails: {
+    color: '#6b7280',
+    marginBottom: '20px'
+  },
+  selectButton: {
+    width: '100%',
+    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    color: 'white',
+    border: 'none',
+    padding: '14px 24px',
+    borderRadius: '10px',
+    fontSize: '1rem',
+    fontWeight: '600',
+    cursor: 'pointer',
+    transition: 'transform 0.2s ease',
+    ':hover': {
+      transform: 'translateY(-2px)'
+    }
+  },
+  overlay: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    background: 'rgba(0,0,0,0.7)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 1000,
+    padding: '20px',
+    backdropFilter: 'blur(4px)',
+    animation: 'fadeIn 0.3s ease'
+  },
+  modal: {
+    background: 'white',
+    borderRadius: '20px',
+    maxWidth: '900px',
+    width: '100%',
+    maxHeight: '90vh',
+    overflowY: 'auto',
+    position: 'relative',
+    boxShadow: '0 25px 50px rgba(0,0,0,0.3)',
+    animation: 'slideUp 0.4s ease'
+  },
+  header: {
+    padding: '30px 30px 20px',
+    borderBottom: '2px solid #f3f4f6',
+    position: 'sticky',
+    top: 0,
+    background: 'white',
+    zIndex: 10
+  },
+  closeBtn: {
+    position: 'absolute',
+    top: '20px',
+    right: '20px',
+    background: 'transparent',
+    border: 'none',
+    cursor: 'pointer',
+    color: '#6b7280',
+    padding: '8px',
+    borderRadius: '8px',
+    transition: 'background 0.2s ease',
+    ':hover': {
+      background: '#f3f4f6'
+    }
+  },
+  routeInfo: {
+    textAlign: 'left'
+  },
+  routeTitle: {
+    fontSize: '1.8rem',
+    fontWeight: '700',
+    color: '#1f2937',
+    marginBottom: '8px'
+  },
+  routeSubtitle: {
+    fontSize: '1rem',
+    color: '#6b7280'
+  },
+  loadingContainer: {
+    padding: '80px',
+    textAlign: 'center'
+  },
+  spinner: {
+    width: '50px',
+    height: '50px',
+    border: '4px solid #f3f4f6',
+    borderTop: '4px solid #667eea',
+    borderRadius: '50%',
+    margin: '0 auto 20px',
+    animation: 'spin 1s linear infinite'
+  },
+  bestDealBanner: {
+    margin: '20px 30px',
+    padding: '24px',
+    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+    borderRadius: '16px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '20px',
+    boxShadow: '0 10px 30px rgba(16, 185, 129, 0.3)',
+    animation: 'pulse 2s ease infinite'
+  },
+  dealIcon: {
+    fontSize: '3rem'
+  },
+  dealInfo: {
+    flex: 1
+  },
+  dealTitle: {
+    color: 'white',
+    fontSize: '1.1rem',
+    fontWeight: '600',
+    marginBottom: '8px'
+  },
+  dealDetails: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+    flexWrap: 'wrap'
+  },
+  dealPrice: {
+    color: 'white',
+    fontSize: '2rem',
+    fontWeight: '700'
+  },
+  dealBadge: {
+    background: 'rgba(255,255,255,0.2)',
+    color: 'white',
+    padding: '6px 12px',
+    borderRadius: '8px',
+    fontSize: '0.9rem',
+    fontWeight: '600'
+  },
+  dealDate: {
+    color: 'rgba(255,255,255,0.9)',
+    fontSize: '0.95rem'
+  },
+  dealCta: {
+    background: 'white',
+    color: '#059669',
+    border: 'none',
+    padding: '12px 24px',
+    borderRadius: '10px',
+    fontSize: '1rem',
+    fontWeight: '600',
+    cursor: 'pointer',
+    whiteSpace: 'nowrap',
+    transition: 'transform 0.2s ease'
+  },
+  trendSection: {
+    margin: '20px 30px',
+    padding: '24px',
+    background: '#f9fafb',
+    borderRadius: '12px'
+  },
+  trendHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '10px',
+    marginBottom: '20px'
+  },
+  trendTitle: {
+    fontSize: '1.2rem',
+    fontWeight: '600',
+    color: '#1f2937'
+  },
+  miniChart: {
+    display: 'flex',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    gap: '8px',
+    height: '120px',
+    marginBottom: '16px'
+  },
+  barContainer: {
+    flex: 1,
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: '8px'
+  },
+  priceBar: {
+    width: '100%',
+    borderRadius: '6px 6px 0 0',
+    position: 'relative',
+    display: 'flex',
+    alignItems: 'flex-start',
+    justifyContent: 'center',
+    padding: '8px 4px',
+    minHeight: '40px',
+    transition: 'all 0.3s ease'
+  },
+  barPrice: {
+    color: 'white',
+    fontSize: '0.75rem',
+    fontWeight: '600'
+  },
+  barDate: {
+    fontSize: '0.75rem',
+    color: '#6b7280'
+  },
+  legend: {
+    display: 'flex',
+    justifyContent: 'center',
+    gap: '20px',
+    flexWrap: 'wrap'
+  },
+  legendItem: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+    fontSize: '0.85rem',
+    color: '#6b7280'
+  },
+  colorBox: {
+    width: '16px',
+    height: '16px',
+    borderRadius: '4px'
+  },
+  dateSelector: {
+    margin: '20px 30px',
+    padding: '24px',
+    background: 'white',
+    borderRadius: '12px',
+    border: '2px solid #f3f4f6'
+  },
+  selectorHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '10px',
+    marginBottom: '20px'
+  },
+  selectorTitle: {
+    fontSize: '1.2rem',
+    fontWeight: '600',
+    color: '#1f2937'
+  },
+  calendarView: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '24px'
+  },
+  monthSection: {
+    width: '100%'
+  },
+  monthTitle: {
+    fontSize: '1.1rem',
+    fontWeight: '600',
+    color: '#1f2937',
+    marginBottom: '12px'
+  },
+  datesGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
+    gap: '12px'
+  },
+  dateCard: {
+    background: 'white',
+    border: '2px solid #e5e7eb',
+    borderRadius: '12px',
+    padding: '16px',
+    cursor: 'pointer',
+    transition: 'all 0.2s ease',
+    position: 'relative',
+    textAlign: 'left',
+    ':hover': {
+      transform: 'translateY(-4px)',
+      boxShadow: '0 8px 20px rgba(0,0,0,0.1)'
+    }
+  },
+  dateCardSelected: {
+    borderColor: '#6366f1',
+    boxShadow: '0 8px 20px rgba(99, 102, 241, 0.3)',
+    transform: 'translateY(-4px)'
+  },
+  dateCardCheapest: {
+    borderColor: '#10b981',
+    background: 'linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)'
+  },
+  cheapestFlag: {
+    position: 'absolute',
+    top: '-10px',
+    right: '-10px',
+    background: '#10b981',
+    color: 'white',
+    padding: '4px 8px',
+    borderRadius: '12px',
+    fontSize: '0.7rem',
+    fontWeight: '700',
+    boxShadow: '0 4px 12px rgba(16, 185, 129, 0.4)'
+  },
+  selectedCheck: {
+    position: 'absolute',
+    top: '8px',
+    right: '8px',
+    background: '#6366f1',
+    color: 'white',
+    width: '24px',
+    height: '24px',
+    borderRadius: '50%',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: '0.9rem',
+    fontWeight: '700'
+  },
+  dateHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: '12px'
+  },
+  dayName: {
+    fontSize: '0.85rem',
+    color: '#6b7280',
+    fontWeight: '500'
+  },
+  dateNum: {
+    fontSize: '1.5rem',
+    fontWeight: '700',
+    color: '#1f2937'
+  },
+  priceInfo: {
+    marginBottom: '8px'
+  },
+  priceAmount: {
+    fontSize: '1.3rem',
+    fontWeight: '700',
+    color: '#1f2937',
+    display: 'block',
+    marginBottom: '4px'
+  },
+  priceBadge: {
+    padding: '4px 8px',
+    borderRadius: '6px',
+    fontSize: '0.7rem',
+    fontWeight: '600',
+    display: 'inline-block'
+  },
+  flightDetails: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    fontSize: '0.8rem',
+    color: '#6b7280'
+  },
+  airlineCode: {
+    fontWeight: '600',
+    color: '#374151'
+  },
+  stops: {
+    fontSize: '0.75rem'
+  },
+  statsFooter: {
+    margin: '20px 30px',
+    padding: '24px',
+    background: 'linear-gradient(135deg, #f9fafb 0%, #f3f4f6 100%)',
+    borderRadius: '12px',
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+    gap: '20px'
+  },
+  statItem: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '8px'
+  },
+  statItemHighlight: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+    padding: '16px',
+    background: 'white',
+    borderRadius: '10px',
+    border: '2px solid #10b981'
+  },
+  statLabel: {
+    fontSize: '0.85rem',
+    color: '#6b7280',
+    fontWeight: '500'
+  },
+  statValue: {
+    fontSize: '1.5rem',
+    fontWeight: '700',
+    color: '#1f2937'
+  },
+  modalActions: {
+    position: 'sticky',
+    bottom: 0,
+    padding: '20px 30px',
+    background: 'white',
+    borderTop: '2px solid #f3f4f6',
+    display: 'flex',
+    gap: '12px',
+    zIndex: 10
+  },
+  btnSecondary: {
+    flex: '0 0 auto',
+    padding: '14px 24px',
+    background: '#f3f4f6',
+    border: 'none',
+    borderRadius: '10px',
+    fontSize: '1rem',
+    fontWeight: '600',
+    color: '#6b7280',
+    cursor: 'pointer',
+    transition: 'background 0.2s ease'
+  },
+  btnPrimary: {
+    flex: 1,
+    padding: '14px 24px',
+    background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
+    border: 'none',
+    borderRadius: '10px',
+    fontSize: '1rem',
+    fontWeight: '600',
+    color: 'white',
+    cursor: 'pointer',
+    transition: 'all 0.2s ease',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '8px'
+  },
+  btnDisabled: {
+    background: '#e5e7eb',
+    color: '#9ca3af',
+    cursor: 'not-allowed'
+  }
+};
+
+// Add CSS animations
+const styleSheet = document.createElement("style");
+styleSheet.textContent = `
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  
+  @keyframes slideUp {
+    from {
+      opacity: 0;
+      transform: translateY(50px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+  
+  @keyframes pulse {
+    0%, 100% {
+      transform: scale(1);
+    }
+    50% {
+      transform: scale(1.02);
+    }
+  }
+  
+  button:hover {
+    opacity: 0.9;
+  }
+  
+  .modal::-webkit-scrollbar {
+    width: 8px;
+  }
+  
+  .modal::-webkit-scrollbar-track {
+    background: #f3f4f6;
+  }
+  
+  .modal::-webkit-scrollbar-thumb {
+    background: #d1d5db;
+    border-radius: 4px;
+  }
+  
+  .modal::-webkit-scrollbar-thumb:hover {
+    background: #9ca3af;
+  }
+`;
+document.head.appendChild(styleSheet);
+
+export default App;

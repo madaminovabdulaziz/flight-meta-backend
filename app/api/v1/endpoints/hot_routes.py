@@ -804,6 +804,754 @@ def get_fallback_routes(origin: str = "TAS") -> List[dict]:
 
 
 
+# app/api/v1/endpoints/hot_routes.py - ENHANCED VERSION
+# Add this NEW endpoint to your existing hot_routes.py
+# app/api/v1/endpoints/hot_routes.py - ENHANCED VERSION
+# Add this NEW endpoint to your existing hot_routes.py
+
+@router.get("/popular-directions", response_model=List[HotRouteResponse])
+async def get_popular_directions_v3(
+    request: Request,
+    destination: str = Query(..., min_length=3, max_length=3, description="Destination IATA code (e.g., 'IST', 'DXB')"),
+    limit: int = Query(10, ge=1, le=30),
+    page: int = Query(1, ge=1),
+    currency: Optional[str] = Query(None),
+    language: Optional[str] = Query(None),
+    db: AsyncSession = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user_optional)
+):
+    """
+    🔥 **NEW** Popular Directions to a Destination (TravelPayouts v3 API)
+    
+    **What Makes This Different from `/hot-routes/`?**
+    - This endpoint answers: "Where do people fly TO Istanbul FROM?"
+    - Your existing `/hot-routes/` answers: "Where can I fly FROM Tashkent TO?"
+    
+    **Use Cases:**
+    - Reverse search: Find popular origins for a destination
+    - Tourism insights: See where visitors come from
+    - Marketing: Target users from high-traffic origins
+    - Alternative airports: Suggest nearby departure points
+    
+    **Why This API is Better:**
+    ✅ Based on REAL user behavior (searches + bookings)
+    ✅ TravelPayouts' ML models (not your manual list)
+    ✅ Single API call (vs 15+ calls in your current method)
+    ✅ Auto-updates as trends change
+    
+    **Smart Features:**
+    - 🌍 Auto-detects user currency (IP-based)
+    - 💰 Converts prices to local currency
+    - 📊 Returns origin cities ranked by popularity
+    - 🔄 Redis cached for 3 hours
+    
+    **Example:**
+    ```
+    GET /hot-routes/popular-directions?destination=IST&limit=20&currency=EUR
+    
+    Response: Top 20 cities people fly FROM to Istanbul
+    ```
+    """
+    destination = destination.upper()
+    
+    # Get user preferences
+    prefs = await get_user_preferences(request, currency, language, current_user)
+    user_currency = prefs["currency"]
+    user_language = prefs["language"]
+    
+    logger.info(f"🎯 Popular directions to {destination} in {user_currency}")
+    
+    # Cache key includes destination + currency
+    cache_key = f"popular_directions_v3:{destination}:{limit}:{page}:{user_currency}"
+    cache_ttl = 10800  # 3 hours (data updates slowly)
+    
+    cached = await cache_get(cache_key)
+    if cached:
+        logger.info(f"✅ CACHE HIT - Popular directions to {destination}")
+        return [HotRouteResponse(**item) for item in cached]
+    
+    logger.info(f"❌ CACHE MISS - Fetching popular directions to {destination}")
+    
+    # Call TravelPayouts v3 API
+    try:
+        api_url = "https://api.travelpayouts.com/aviasales/v3/get_popular_directions"
+        
+        params = {
+            "destination": destination,
+            "locale": user_language,
+            "currency": "USD",  # Always fetch in USD, convert later
+            "limit": limit,
+            "page": page,
+            "token": settings.TRAVELPAYOUTS_API_TOKEN
+        }
+        
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.get(api_url, params=params)
+            response.raise_for_status()
+            
+            data = response.json()
+            
+            # Validate response
+            if not data.get("success"):
+                logger.warning(f"API returned success=false for {destination}")
+                raise HTTPException(
+                    status_code=502,
+                    detail=f"No popular directions found for {destination}"
+                )
+            
+            # Extract routes from response
+            routes = []
+            api_data = data.get("data", {})
+            
+            destination_info = api_data.get("destination", {})
+            origins = api_data.get("origin", [])
+            
+            if not origins:
+                logger.warning(f"No origin cities found for {destination}")
+                # Return empty but don't fail
+                return []
+            
+            # Parse each origin route
+            for origin_data in origins:
+                # Parse dates properly - convert empty strings to None
+                departure_date = origin_data.get("departure_at")
+                return_date = origin_data.get("return_at")
+                
+                # Convert empty strings to None for Pydantic validation
+                if not departure_date or departure_date == "":
+                    departure_date = None
+                if not return_date or return_date == "":
+                    return_date = None
+                
+                route = {
+                    "origin": origin_data.get("city_iata"),
+                    "destination": destination,
+                    "origin_city": origin_data.get("city_name"),
+                    "destination_city": destination_info.get("city_name"),
+                    "destination_country": destination_info.get("country_name"),
+                    "price": float(origin_data.get("price", 0)),
+                    "currency": "USD",
+                    "departure_date": departure_date,
+                    "return_date": return_date,
+                    "image_url": DESTINATION_IMAGES.get(destination, 
+                        "https://images.unsplash.com/photo-1436491865332-7a61a109cc05?w=400")
+                }
+                
+                routes.append(route)
+            
+            logger.info(f"✅ Fetched {len(routes)} popular origins for {destination}")
+            
+            # Enrich with full airport data
+            routes = await enrich_with_airport_data(routes, db)
+            
+            # Convert prices to user currency
+            if user_currency != "USD":
+                for route in routes:
+                    route["price"] = await LocalizationService.convert_price(
+                        route["price"],
+                        "USD",
+                        user_currency
+                    )
+                    route["currency"] = user_currency
+            
+            # Add currency symbol
+            for route in routes:
+                route["currency_symbol"] = prefs["currency_symbol"]
+            
+            # Sort by price (already sorted by API, but ensure)
+            routes.sort(key=lambda x: x.get("price", 999999))
+            
+            # Cache the results
+            await cache_set(cache_key, routes, cache_ttl)
+            
+            logger.info(f"📊 Returning {len(routes)} routes in {user_currency}")
+            
+            return [HotRouteResponse(**route) for route in routes]
+    
+    except httpx.TimeoutException:
+        logger.error(f"Timeout fetching popular directions for {destination}")
+        raise HTTPException(
+            status_code=504,
+            detail="Request timed out"
+        )
+    
+    except httpx.HTTPStatusError as e:
+        logger.error(f"HTTP error {e.response.status_code}: {e.response.text}")
+        raise HTTPException(
+            status_code=e.response.status_code,
+            detail=f"TravelPayouts API error: {e.response.text}"
+        )
+    
+    except Exception as e:
+        logger.error(f"Error fetching popular directions: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to fetch popular directions: {str(e)}"
+        )
+
+
+@router.get("/destination-insights/{iata_code}")
+async def get_destination_insights(
+    request: Request,
+    iata_code: str,
+    currency: Optional[str] = Query(None),
+    db: AsyncSession = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user_optional)
+):
+    """
+    📊 Destination Insights Dashboard
+    
+    Combines multiple data sources for a destination:
+    1. Popular origin cities (where people fly FROM)
+    2. Average prices
+    3. Best time to fly
+    4. Trending status
+    
+    Perfect for:
+    - Destination landing pages
+    - Travel planning UI
+    - Marketing analytics
+    
+    **Example:**
+    ```
+    GET /hot-routes/destination-insights/IST?currency=USD
+    
+    Returns comprehensive data about Istanbul as a destination
+    ```
+    """
+    iata_code = iata_code.upper()
+    
+    # Get user preferences
+    prefs = await get_user_preferences(request, currency, None, current_user)
+    user_currency = prefs["currency"]
+    
+    cache_key = f"destination_insights:{iata_code}:{user_currency}"
+    
+    cached = await cache_get(cache_key)
+    if cached:
+        return cached
+    
+    try:
+        # Fetch popular directions
+        api_url = "https://api.travelpayouts.com/aviasales/v3/get_popular_directions"
+        
+        params = {
+            "destination": iata_code,
+            "locale": "en",
+            "currency": "USD",
+            "limit": 30,
+            "page": 1,
+            "token": settings.TRAVELPAYOUTS_API_TOKEN
+        }
+        
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.get(api_url, params=params)
+            response.raise_for_status()
+            data = response.json()
+        
+        if not data.get("success"):
+            raise HTTPException(status_code=404, detail="Destination not found")
+        
+        # Get airport info
+        airport_result = await db.execute(
+            select(Airport).where(Airport.iata_code == iata_code)
+        )
+        airport = airport_result.scalar_one_or_none()
+        
+        if not airport:
+            raise HTTPException(status_code=404, detail="Airport not found in database")
+        
+        # Parse data
+        destination_info = data.get("data", {}).get("destination", {})
+        origins = data.get("data", {}).get("origin", [])
+        
+        # Calculate insights
+        prices = [float(o.get("price", 0)) for o in origins if o.get("price")]
+        
+        insights = {
+            "destination": {
+                "iata": iata_code,
+                "city": destination_info.get("city_name", airport.city),
+                "country": destination_info.get("country_name", airport.country),
+                "airport_name": airport.name,
+                "timezone": airport.timezone
+            },
+            "statistics": {
+                "total_origin_cities": len(origins),
+                "average_price": round(sum(prices) / len(prices), 2) if prices else None,
+                "cheapest_price": min(prices) if prices else None,
+                "most_expensive_price": max(prices) if prices else None,
+                "currency": "USD"
+            },
+            "top_origin_cities": [
+                {
+                    "city": o.get("city_name"),
+                    "iata": o.get("city_iata"),
+                    "price": float(o.get("price", 0)),
+                    "departure_date": o.get("departure_at")
+                }
+                for o in origins[:10]
+            ]
+        }
+        
+        # Convert prices to user currency
+        if user_currency != "USD":
+            for key in ["average_price", "cheapest_price", "most_expensive_price"]:
+                if insights["statistics"][key]:
+                    insights["statistics"][key] = await LocalizationService.convert_price(
+                        insights["statistics"][key],
+                        "USD",
+                        user_currency
+                    )
+            
+            for city in insights["top_origin_cities"]:
+                city["price"] = await LocalizationService.convert_price(
+                    city["price"],
+                    "USD",
+                    user_currency
+                )
+            
+            insights["statistics"]["currency"] = user_currency
+        
+        insights["currency_symbol"] = prefs["currency_symbol"]
+        
+        # Cache for 6 hours
+        await cache_set(cache_key, insights, 21600)
+        
+        return insights
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching destination insights: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+    
+
+
+# Add to your hot_routes.py or create a new flights_v3.py
+
+@router.get("/prices-for-dates")
+async def get_prices_for_specific_dates(
+    request: Request,
+    origin: str = Query(..., min_length=3, max_length=3, description="Origin IATA code"),
+    destination: str = Query(..., min_length=3, max_length=3, description="Destination IATA code"),
+    departure_at: str = Query(..., description="Departure date (YYYY-MM or YYYY-MM-DD)"),
+    return_at: Optional[str] = Query(None, description="Return date (YYYY-MM or YYYY-MM-DD), omit for one-way"),
+    one_way: bool = Query(True, description="One-way ticket (true) or round-trip (false)"),
+    direct: bool = Query(False, description="Direct flights only"),
+    sorting: str = Query("price", regex="^(price|route)$", description="Sort by: price or route popularity"),
+    unique: bool = Query(False, description="Return only unique routes"),
+    limit: int = Query(30, ge=1, le=1000, description="Results per page (max 1000)"),
+    page: int = Query(1, ge=1, description="Page number for pagination"),
+    currency: Optional[str] = Query(None),
+    language: Optional[str] = Query(None),
+    db: AsyncSession = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user_optional)
+):
+    """
+    🎯 **NEW V3 API** - Flight Prices for Specific Dates
+    
+    **The Modern Replacement for Old Endpoints**
+    
+    Returns the cheapest tickets found by Aviasales users in the **last 48 hours**.
+    This is the most up-to-date price data available from TravelPayouts.
+    
+    **What Makes This Better:**
+    - ✅ Fresher data (last 48h vs 30 days)
+    - ✅ Unified endpoint (replaces 4 old APIs)
+    - ✅ More filtering options (direct, unique, sorting)
+    - ✅ Better pagination (up to 1000 results)
+    - ✅ Route popularity sorting
+    
+    **Replaces These Old Endpoints:**
+    - `/v1/prices/cheap` → Use `sorting=price`
+    - `/v1/prices/direct` → Use `direct=true`
+    - `/v1/city-directions` → Use `sorting=route&unique=true`
+    - `/v2/prices/latest` → This is the newer version
+    
+    **Use Cases:**
+    1. **Specific Date Search**: "Flights on July 28"
+       - `departure_at=2025-07-28`
+    
+    2. **Month Flexibility**: "Flights in July"
+       - `departure_at=2025-07`
+    
+    3. **Direct Flights Only**: "Non-stop to Dubai"
+       - `direct=true`
+    
+    4. **Popular Routes**: "Most searched routes from TAS"
+       - `sorting=route&unique=true`
+    
+    5. **Round-trip**: "Return flights"
+       - `one_way=false&return_at=2025-08-15`
+    
+    **Smart Features:**
+    - 🌍 Auto-detects user currency
+    - 💰 Converts all prices to local currency
+    - 📊 Includes flight duration and transfer info
+    - 🔗 Returns direct booking links (affiliate)
+    - ⚡ Cached for 30 minutes (prices refresh)
+    
+    **Response Fields:**
+    - `price` - Ticket price in user's currency
+    - `airline` - Airline IATA code (e.g., "TK")
+    - `flight_number` - Flight number
+    - `departure_at` - Departure datetime (ISO 8601)
+    - `return_at` - Return datetime (if round-trip)
+    - `transfers` - Number of stops outbound
+    - `return_transfers` - Number of stops return
+    - `duration` - Total trip duration (minutes)
+    - `duration_to` - Outbound duration (minutes)
+    - `duration_back` - Return duration (minutes)
+    - `link` - Deep link to booking page
+    
+    **Example Queries:**
+    ```
+    # One-way to Istanbul in July
+    GET /prices-for-dates?origin=TAS&destination=IST&departure_at=2025-07&one_way=true
+    
+    # Round-trip direct flights
+    GET /prices-for-dates?origin=TAS&destination=DXB&departure_at=2025-07-15&return_at=2025-07-22&direct=true&one_way=false
+    
+    # Popular routes from Tashkent
+    GET /prices-for-dates?origin=TAS&sorting=route&unique=true&limit=50
+    ```
+    """
+    origin = origin.upper()
+    destination = destination.upper()
+    
+    # Get user preferences
+    prefs = await get_user_preferences(request, currency, language, current_user)
+    user_currency = prefs["currency"]
+    user_language = prefs["language"]
+    
+    logger.info(f"🎯 V3 Price search: {origin}→{destination} on {departure_at} in {user_currency}")
+    
+    # Build cache key
+    cache_key = f"prices_v3:{origin}:{destination}:{departure_at}:{return_at}:{one_way}:{direct}:{sorting}:{unique}:{limit}:{page}:{user_currency}"
+    cache_ttl = 1800  # 30 minutes (prices refresh every 30-60 min)
+    
+    cached = await cache_get(cache_key)
+    if cached:
+        logger.info(f"✅ CACHE HIT - V3 prices")
+        return cached
+    
+    logger.info(f"❌ CACHE MISS - Fetching V3 prices")
+    
+    try:
+        # Call TravelPayouts V3 API
+        api_url = "https://api.travelpayouts.com/aviasales/v3/prices_for_dates"
+        
+        params = {
+            "origin": origin,
+            "destination": destination,
+            "departure_at": departure_at,
+            "one_way": str(one_way).lower(),
+            "direct": str(direct).lower(),
+            "sorting": sorting,
+            "unique": str(unique).lower(),
+            "currency": "USD",  # Always fetch in USD, convert later
+            "limit": limit,
+            "page": page,
+            "token": settings.TRAVELPAYOUTS_API_TOKEN
+        }
+        
+        # Add return date if round-trip
+        if return_at and not one_way:
+            params["return_at"] = return_at
+        
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            response = await client.get(api_url, params=params)
+            response.raise_for_status()
+            
+            data = response.json()
+            
+            # Validate response
+            if not data.get("success"):
+                logger.warning(f"V3 API returned success=false")
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"No flights found for {origin}→{destination} on {departure_at}"
+                )
+            
+            flights = data.get("data", [])
+            
+            if not flights:
+                logger.info(f"No results for {origin}→{destination}")
+                return []
+            
+            logger.info(f"✅ Found {len(flights)} flights from V3 API")
+            
+            # Enrich and transform data
+            enriched_flights = []
+            
+            for flight in flights:
+                # Parse dates properly
+                departure_datetime = flight.get("departure_at")
+                return_datetime = flight.get("return_at")
+                
+                # Build deep link for booking
+                link_fragment = flight.get("link", "")
+                booking_url = f"https://www.aviasales.com{link_fragment}" if link_fragment else None
+                
+                enriched_flight = {
+                    # Route info
+                    "origin": flight.get("origin"),
+                    "destination": flight.get("destination"),
+                    "origin_airport": flight.get("origin_airport"),
+                    "destination_airport": flight.get("destination_airport"),
+                    
+                    # Pricing
+                    "price": float(flight.get("price", 0)),
+                    "currency": "USD",
+                    
+                    # Flight details
+                    "airline": flight.get("airline"),
+                    "flight_number": flight.get("flight_number"),
+                    "departure_at": departure_datetime,
+                    "return_at": return_datetime,
+                    
+                    # Transfer info
+                    "transfers": flight.get("transfers", 0),
+                    "return_transfers": flight.get("return_transfers", 0),
+                    "is_direct": flight.get("transfers", 0) == 0,
+                    
+                    # Duration (in minutes)
+                    "duration_total": flight.get("duration"),
+                    "duration_outbound": flight.get("duration_to"),
+                    "duration_return": flight.get("duration_back"),
+                    
+                    # Booking
+                    "booking_url": booking_url,
+                    "link_fragment": link_fragment,
+                    
+                    # Trip type
+                    "trip_type": "one-way" if one_way else "round-trip"
+                }
+                
+                enriched_flights.append(enriched_flight)
+            
+            # Convert prices to user currency
+            if user_currency != "USD":
+                for flight in enriched_flights:
+                    flight["price"] = await LocalizationService.convert_price(
+                        flight["price"],
+                        "USD",
+                        user_currency
+                    )
+                    flight["currency"] = user_currency
+            
+            # Add currency symbol
+            for flight in enriched_flights:
+                flight["currency_symbol"] = prefs["currency_symbol"]
+            
+            # Enrich with airport names
+            enriched_flights = await enrich_with_airport_data(enriched_flights, db)
+            
+            # Sort by price (API sorts, but ensure after conversion)
+            if sorting == "price":
+                enriched_flights.sort(key=lambda x: x.get("price", 999999))
+            
+            # Add statistics
+            prices = [f["price"] for f in enriched_flights]
+            result = {
+                "success": True,
+                "flights": enriched_flights,
+                "metadata": {
+                    "origin": origin,
+                    "destination": destination,
+                    "departure_at": departure_at,
+                    "return_at": return_at,
+                    "one_way": one_way,
+                    "direct": direct,
+                    "count": len(enriched_flights),
+                    "currency": user_currency,
+                    "currency_symbol": prefs["currency_symbol"],
+                    "statistics": {
+                        "cheapest": min(prices) if prices else None,
+                        "average": round(sum(prices) / len(prices), 2) if prices else None,
+                        "most_expensive": max(prices) if prices else None,
+                        "direct_flights_count": sum(1 for f in enriched_flights if f.get("is_direct"))
+                    },
+                    "filters_applied": {
+                        "direct_only": direct,
+                        "unique_routes": unique,
+                        "sorting": sorting
+                    },
+                    "pagination": {
+                        "page": page,
+                        "limit": limit,
+                        "has_more": len(enriched_flights) == limit
+                    }
+                }
+            }
+            
+            # Cache the results
+            await cache_set(cache_key, result, cache_ttl)
+            
+            logger.info(f"📊 Returning {len(enriched_flights)} flights in {user_currency}")
+            
+            return result
+    
+    except httpx.TimeoutException:
+        logger.error(f"Timeout fetching V3 prices")
+        raise HTTPException(status_code=504, detail="Request timed out")
+    
+    except httpx.HTTPStatusError as e:
+        logger.error(f"HTTP error {e.response.status_code}: {e.response.text}")
+        raise HTTPException(
+            status_code=e.response.status_code,
+            detail=f"TravelPayouts API error: {e.response.text}"
+        )
+    
+    except Exception as e:
+        logger.error(f"Error fetching V3 prices: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to fetch prices: {str(e)}"
+        )
+
+
+@router.get("/search-alternatives")
+async def search_flight_alternatives(
+    request: Request,
+    origin: str = Query(..., description="Origin IATA"),
+    destination: str = Query(..., description="Destination IATA"),
+    departure_month: str = Query(..., description="Month (YYYY-MM)"),
+    currency: Optional[str] = Query(None),
+    db: AsyncSession = Depends(get_db),
+    current_user: Optional[User] = Depends(get_current_user_optional)
+):
+    """
+    🔍 Smart Alternative Flight Finder
+    
+    Uses the V3 API to find:
+    1. Cheapest dates in the month
+    2. Direct vs connecting options
+    3. Different date combinations
+    
+    Perfect for "flexible dates" users.
+    """
+    origin = origin.upper()
+    destination = destination.upper()
+    
+    prefs = await get_user_preferences(request, currency, None, current_user)
+    user_currency = prefs["currency"]
+    
+    cache_key = f"alternatives_v3:{origin}:{destination}:{departure_month}:{user_currency}"
+    
+    cached = await cache_get(cache_key)
+    if cached:
+        return cached
+    
+    try:
+        api_url = "https://api.travelpayouts.com/aviasales/v3/prices_for_dates"
+        
+        # Fetch both direct and connecting flights
+        results = {
+            "direct_flights": [],
+            "connecting_flights": [],
+            "cheapest_overall": None,
+            "recommendations": []
+        }
+        
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            # Get direct flights
+            direct_params = {
+                "origin": origin,
+                "destination": destination,
+                "departure_at": departure_month,
+                "direct": "true",
+                "sorting": "price",
+                "currency": "USD",
+                "limit": 10,
+                "token": settings.TRAVELPAYOUTS_API_TOKEN
+            }
+            
+            direct_response = await client.get(api_url, params=direct_params)
+            if direct_response.status_code == 200:
+                direct_data = direct_response.json()
+                if direct_data.get("success"):
+                    results["direct_flights"] = direct_data.get("data", [])[:5]
+            
+            # Get all flights (including connections)
+            all_params = {
+                **direct_params,
+                "direct": "false",
+                "limit": 20
+            }
+            
+            all_response = await client.get(api_url, params=all_params)
+            if all_response.status_code == 200:
+                all_data = all_response.json()
+                if all_data.get("success"):
+                    all_flights = all_data.get("data", [])
+                    
+                    # Separate connecting flights
+                    results["connecting_flights"] = [
+                        f for f in all_flights 
+                        if f.get("transfers", 0) > 0
+                    ][:5]
+                    
+                    # Find cheapest overall
+                    if all_flights:
+                        results["cheapest_overall"] = min(
+                            all_flights,
+                            key=lambda x: x.get("price", 999999)
+                        )
+        
+        # Convert prices
+        if user_currency != "USD":
+            for category in ["direct_flights", "connecting_flights"]:
+                for flight in results[category]:
+                    flight["price"] = await LocalizationService.convert_price(
+                        flight["price"],
+                        "USD",
+                        user_currency
+                    )
+                    flight["currency"] = user_currency
+            
+            if results["cheapest_overall"]:
+                results["cheapest_overall"]["price"] = await LocalizationService.convert_price(
+                    results["cheapest_overall"]["price"],
+                    "USD",
+                    user_currency
+                )
+                results["cheapest_overall"]["currency"] = user_currency
+        
+        # Add recommendations
+        if results["direct_flights"]:
+            results["recommendations"].append(
+                f"✈️ {len(results['direct_flights'])} direct flights available"
+            )
+        
+        if results["connecting_flights"]:
+            avg_savings = 0
+            if results["direct_flights"] and results["connecting_flights"]:
+                avg_direct = sum(f["price"] for f in results["direct_flights"]) / len(results["direct_flights"])
+                avg_connecting = sum(f["price"] for f in results["connecting_flights"]) / len(results["connecting_flights"])
+                avg_savings = avg_direct - avg_connecting
+            
+            if avg_savings > 0:
+                results["recommendations"].append(
+                    f"💰 Save ~{round(avg_savings)} {user_currency} with connecting flights"
+                )
+        
+        results["currency"] = user_currency
+        results["currency_symbol"] = prefs["currency_symbol"]
+        
+        await cache_set(cache_key, results, 3600)
+        
+        return results
+    
+    except Exception as e:
+        logger.error(f"Error in alternatives search: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+
+
+    
 
 ### ----- ENABLE THIS ROUTER IN PRODUCTION ---------
 # @router.get("/trending", response_model=List[HotRouteResponse])
