@@ -11,6 +11,17 @@ class Settings(BaseSettings):
     PROJECT_NAME: str = "FlyUz Flight Aggregator"
     API_V1_STR: str = "/api/v1"
 
+    OPENAI_API_KEY: str
+    OPENAI_MODEL: str = "gpt-4o"  # Best model for function calling
+    OPENAI_MAX_TOKENS: int = 1000
+    OPENAI_TEMPERATURE: float = 0.3  # Lower = more consistent extraction
+    
+    # AI Feature Flags
+    ENABLE_AI_SEARCH: bool = True
+    AI_FALLBACK_TO_TRADITIONAL: bool = True
+    AI_RATE_LIMIT_PER_MINUTE: int = 20
+
+
     # --- Amadeus Credentials (Existing) ---
     AMADEUS_API_KEY: str
     AMADEUS_API_SECRET: str
@@ -24,9 +35,13 @@ class Settings(BaseSettings):
     # --- Redis ---
     REDIS_URI: str
 
+    CELERY_BROKER_URL: str
+    CELERY_RESULT_BACKEND: str
+
     # --- NEW: Travelpayouts free token ---
 
     TRAVELPAYOUTS_API_TOKEN: str
+    TRAVELPAYOUTS_MARKER: str
 
     # --- Database (Existing - MySQL) ---
     DB_USER: str 
