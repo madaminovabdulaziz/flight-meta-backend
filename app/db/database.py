@@ -1,15 +1,22 @@
+# app/db/database.py - FIXED
 import logging
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker, declarative_base
 from app.core.config import settings
 
 logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 try:
-    engine = create_async_engine(settings.DATABASE_URL, pool_pre_ping=True)
-    logging.info("Async engine created successfully.")
+    # Use the property method to get DATABASE_URL
+    engine = create_async_engine(
+        settings.get_database_url,  # Changed from settings.DATABASE_URL
+        pool_pre_ping=True,
+        echo=False  # Set to True for SQL debugging
+    )
+    logger.info("✅ Async database engine created successfully.")
 except Exception as e:
-    logging.error(f"Failed to create async engine: {e}")
+    logger.error(f"❌ Failed to create async engine: {e}")
     raise
 
 # Use expire_on_commit=False to keep objects usable after commit
@@ -30,11 +37,11 @@ async def get_db() -> AsyncSession:
     """
     async with AsyncSessionLocal() as session:
         try:
-            logging.debug("New async database session created.")
+            logger.debug("New async database session created.")
             yield session
         finally:
             await session.close()
-            logging.debug("Async database session closed.")
+            logger.debug("Async database session closed.")
 
 def get_engine():
     """Helper to expose engine (useful for migrations)."""
