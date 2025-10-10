@@ -1,4 +1,4 @@
-# app/core/config.py - FIXED for Pydantic v2
+# app/core/config.py - FIXED with Optional Fields for Railway
 import os
 from typing import List, Optional
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -11,8 +11,8 @@ class Settings(BaseSettings):
     PROJECT_NAME: str = "FlyUz Flight Aggregator"
     API_V1_STR: str = "/api/v1"
 
-    # OpenAI
-    OPENAI_API_KEY: str
+    # OpenAI - Make optional with defaults
+    OPENAI_API_KEY: str = ""  # Empty string as default
     OPENAI_MODEL: str = "gpt-4o"
     OPENAI_MAX_TOKENS: int = 1000
     OPENAI_TEMPERATURE: float = 0.3
@@ -22,9 +22,9 @@ class Settings(BaseSettings):
     AI_FALLBACK_TO_TRADITIONAL: bool = True
     AI_RATE_LIMIT_PER_MINUTE: int = 20
 
-    # Amadeus Credentials
-    AMADEUS_API_KEY: str
-    AMADEUS_API_SECRET: str
+    # Amadeus Credentials - Make optional
+    AMADEUS_API_KEY: str = ""
+    AMADEUS_API_SECRET: str = ""
     AMADEUS_TOKEN_URL: str = "https://test.api.amadeus.com/v1/security/oauth2/token"
     AMADEUS_SEARCH_URL: str = "https://test.api.amadeus.com/v2/shopping/flight-offers"
     
@@ -32,16 +32,16 @@ class Settings(BaseSettings):
     DUFFEL_API_KEY: str = ""
     DUFFEL_API_URL: str = "https://api.duffel.com"
     
-    # Redis
-    REDIS_URI: str
+    # Redis - Make optional with default
+    REDIS_URI: str = "redis://localhost:6379/0"
 
-    # Celery
-    CELERY_BROKER_URL: str
-    CELERY_RESULT_BACKEND: str
+    # Celery - Make optional with defaults
+    CELERY_BROKER_URL: str = "redis://localhost:6379/1"
+    CELERY_RESULT_BACKEND: str = "redis://localhost:6379/1"
 
-    # Travelpayouts
-    TRAVELPAYOUTS_API_TOKEN: str
-    TRAVELPAYOUTS_MARKER: str
+    # Travelpayouts - Make optional
+    TRAVELPAYOUTS_API_TOKEN: str = ""
+    TRAVELPAYOUTS_MARKER: str = ""
 
     # Database - Support both formats (Railway and local)
     # Option 1: Full DATABASE_URL (for Railway)
@@ -58,9 +58,10 @@ class Settings(BaseSettings):
     def get_database_url(self) -> str:
         """Get database URL - supports both Railway and local"""
         if self.DATABASE_URL:
+            # Railway provides this
             return self.DATABASE_URL
         
-        # Build from components
+        # Build from components for local dev
         if all([self.DB_USER, self.DB_PASSWORD, self.DB_HOST, self.DB_NAME]):
             return f"mysql+aiomysql://{self.DB_USER}:{self.DB_PASSWORD}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
         
@@ -71,12 +72,12 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 days
     ALGORITHM: str = "HS256"
 
-    # Google OAuth
+    # Google OAuth - Optional
     GOOGLE_CLIENT_ID: str = ""
     GOOGLE_CLIENT_SECRET: str = ""
     GOOGLE_REDIRECT_URI: str = "http://127.0.0.1:8000/api/v1/auth/google/callback"
 
-    # Payment Providers
+    # Payment Providers - All optional
     STRIPE_SECRET_KEY: str = ""
     STRIPE_PUBLISHABLE_KEY: str = ""
     STRIPE_WEBHOOK_SECRET: str = ""
@@ -88,11 +89,11 @@ class Settings(BaseSettings):
     PAYME_MERCHANT_ID: str = ""
     PAYME_SECRET_KEY: str = ""
     
-    # Email
+    # Email - Optional
     SENDGRID_API_KEY: str = ""
     FROM_EMAIL: str = "noreply@flyuz.uz"
     
-    # SMS
+    # SMS - Optional
     ESKIZ_EMAIL: str = ""
     ESKIZ_PASSWORD: str = ""
 
@@ -106,7 +107,7 @@ class Settings(BaseSettings):
     CACHE_TTL_SEARCH: int = 900  # 15 minutes
     CACHE_TTL_OFFERS: int = 300  # 5 minutes
 
-    # Pydantic v2 config - REPLACES the old Config class
+    # Pydantic v2 config
     model_config = SettingsConfigDict(
         case_sensitive=True,
         env_file=".env",
@@ -115,7 +116,6 @@ class Settings(BaseSettings):
     )
 
 settings = Settings()
-
 
 # # app/core/config.py
 # import os
