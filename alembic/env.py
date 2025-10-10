@@ -1,6 +1,10 @@
 from logging.config import fileConfig
-from sqlalchemy import engine_from_config, pool
+from sqlalchemy import pool
+from sqlalchemy.engine import Connection
+from sqlalchemy.ext.asyncio import async_engine_from_config
 from alembic import context
+import asyncio
+
 from app.models.models import Base
 from app.core.config import settings
 
@@ -12,11 +16,12 @@ if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 # IMPORTANT: Set the database URL from settings
-# This allows alembic to work with both local and Railway databases
+# This ensures aiomysql:// driver is used
 config.set_main_option('sqlalchemy.url', settings.get_database_url)
 
 # Add your model's MetaData for 'autogenerate' support
 target_metadata = Base.metadata
+
 
 def run_migrations_offline() -> None:
     """Run migrations in 'offline' mode."""
@@ -32,22 +37,34 @@ def run_migrations_offline() -> None:
         context.run_migrations()
 
 
-def run_migrations_online() -> None:
-    """Run migrations in 'online' mode."""
-    connectable = engine_from_config(
+def do_run_migrations(connection: Connection) -> None:
+    """Run migrations with a connection."""
+    context.configure(
+        connection=connection,
+        target_metadata=target_metadata
+    )
+
+    with context.begin_transaction():
+        context.run_migrations()
+
+
+async def run_async_migrations() -> None:
+    """Run migrations in async mode using aiomysql."""
+    connectable = async_engine_from_config(
         config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
     )
 
-    with connectable.connect() as connection:
-        context.configure(
-            connection=connection, 
-            target_metadata=target_metadata
-        )
+    async with connectable.connect() as connection:
+        await connection.run_sync(do_run_migrations)
 
-        with context.begin_transaction():
-            context.run_migrations()
+    await connectable.dispose()
+
+
+def run_migrations_online() -> None:
+    """Run migrations in 'online' mode using async."""
+    asyncio.run(run_async_migrations())
 
 
 if context.is_offline_mode():
