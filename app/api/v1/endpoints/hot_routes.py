@@ -32,20 +32,68 @@ POPULAR_INTERNATIONAL_DESTINATIONS = [
     "JFK", "LHR", "CDG", "FRA", "AMS", "BCN", "ROM"
 ]
 
+DEFAULT_DESTINATION_IMAGE = "https://images.unsplash.com/photo-1436491865332-7a61a109cc05?w=800&q=80"
+# app/api/v1/endpoints/hot_routes.py
+
+# --- REPLACE your existing DESTINATION_IMAGES dictionary with this one ---
+
 DESTINATION_IMAGES = {
-    "IST": "https://images.unsplash.com/photo-1524231757912-21f4fe3a7200?w=400",
-    "DXB": "https://images.unsplash.com/photo-1512453979798-5ea266f8880c?w=400",
-    "SHJ": "https://images.unsplash.com/photo-1512453979798-5ea266f8880c?w=400",
-    "DEL": "https://images.unsplash.com/photo-1587474260584-136574528ed5?w=400",
-    "BOM": "https://images.unsplash.com/photo-1570168007204-dfb528c6958f?w=400",
-    "KUL": "https://images.unsplash.com/photo-1596422846543-75c6fc197f07?w=400",
-    "BKK": "https://images.unsplash.com/photo-1508009603885-50cf7c579365?w=400",
-    "ICN": "https://images.unsplash.com/photo-1517154421773-0529f29ea451?w=400",
-    "MOW": "https://images.unsplash.com/photo-1513326738677-b964603b136d?w=400",
-    "LED": "https://images.unsplash.com/photo-1556543961-ea5d8a2e8a02?w=400",
-    "ALA": "https://images.unsplash.com/photo-1559827260-dc66d52bef19?w=400",
-    "JFK": "https://images.unsplash.com/photo-1496442226666-8d4d0e62e6e9?w=400",
-    "LHR": "https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?w=400",
+    # === Middle East & Turkey ===
+    "IST": "https://images.unsplash.com/photo-1524231757912-21f4fe3a7200?w=400",  # Istanbul, Turkey
+    "AYT": "https://images.unsplash.com/photo-1617431332082-5635f1f9e2af?w=400",  # Antalya, Turkey
+    "DXB": "https://images.unsplash.com/photo-1512453979798-5ea266f8880c?w=400",  # Dubai, UAE
+    "SHJ": "https://images.unsplash.com/photo-1512453979798-5ea266f8880c?w=400",  # Sharjah, UAE (using Dubai image)
+    "AUH": "https://images.unsplash.com/photo-1503415397539-a9a7c64503a5?w=400",  # Abu Dhabi, UAE
+    "DOH": "https://images.unsplash.com/photo-1559827260-dc66d52bef19?w=400",  # Doha, Qatar
+    "JED": "https://images.unsplash.com/photo-1596422846543-75c6fc197f07?w=400",  # Jeddah, Saudi Arabia
+    "RUH": "https://images.unsplash.com/photo-1587474260584-136574528ed5?w=400",  # Riyadh, Saudi Arabia
+    "TLV": "https://images.unsplash.com/photo-1534351590666-13e3e96b5017?w=400",  # Tel Aviv, Israel
+
+    # === Europe ===
+    "LHR": "https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?w=400",  # London, UK
+    "CDG": "https://images.unsplash.com/photo-1502602898657-3e91760c0337?w=400",  # Paris, France
+    "AMS": "https://images.unsplash.com/photo-1534351590666-13e3e96b5017?w=400",  # Amsterdam, Netherlands
+    "FRA": "https://images.unsplash.com/photo-1502103823424-959c9a826a38?w=400",  # Frankfurt, Germany
+    "BCN": "https://images.unsplash.com/photo-1518780664697-55e3ad937233?w=400",  # Barcelona, Spain
+    "MAD": "https://images.unsplash.com/photo-1539037116277-4db20889f2d4?w=400",  # Madrid, Spain
+    "FCO": "https://images.unsplash.com/photo-1529260830199-42c24129f196?w=400",  # Rome, Italy
+    "ROM": "https://images.unsplash.com/photo-1529260830199-42c24129f196?w=400",  # Rome, Italy (generic)
+    "DUB": "https://images.unsplash.com/photo-1553988983-ecc9f523d040?w=400",  # Dublin, Ireland
+    "LIS": "https://images.unsplash.com/photo-1522228512835-26a45e54817c?w=400",  # Lisbon, Portugal
+    "ATH": "https://images.unsplash.com/photo-1591129944900-84a5303a72ad?w=400",  # Athens, Greece
+    "PRG": "https://images.unsplash.com/photo-1522525287612-6f25455ca8a2?w=400",  # Prague, Czech Republic
+    "VIE": "https://images.unsplash.com/photo-1560840067-ddcaeb7831d2?w=400",  # Vienna, Austria
+    "BUD": "https://images.unsplash.com/photo-1528114639423-4573883a8bcf?w=400",  # Budapest, Hungary
+
+    # === CIS Region ===
+    "MOW": "https://images.unsplash.com/photo-1513326738677-b964603b136d?w=400",  # Moscow, Russia
+    "LED": "https://images.unsplash.com/photo-1556543961-ea5d8a2e8a02?w=400",  # St. Petersburg, Russia
+    "ALA": "https://images.unsplash.com/photo-1559827260-dc66d52bef19?w=400",  # Almaty, Kazakhstan
+    "FRU": "https://images.unsplash.com/photo-1601625841499-01b34ec91c6e?w=400",  # Bishkek, Kyrgyzstan
+    "TAS": "https://images.unsplash.com/photo-1596383648434-153364f378ae?w=400",  # Tashkent, Uzbekistan
+    "GYD": "https://images.unsplash.com/photo-1634841923617-83688225a0b7?w=400",  # Baku, Azerbaijan
+    
+    # === Asia Pacific ===
+    "BKK": "https://images.unsplash.com/photo-1508009603885-50cf7c579365?w=400",  # Bangkok, Thailand
+    "KUL": "https://images.unsplash.com/photo-1596422846543-75c6fc197f07?w=400",  # Kuala Lumpur, Malaysia
+    "SIN": "https://images.unsplash.com/photo-1525625293386-3f8f99389edd?w=400",  # Singapore
+    "ICN": "https://images.unsplash.com/photo-1517154421773-0529f29ea451?w=400",  # Seoul, South Korea
+    "NRT": "https://images.unsplash.com/photo-1503899036084-c55cdd92da26?w=400",  # Tokyo, Japan
+    "PEK": "https://images.unsplash.com/photo-1529989658210-a781b8548325?w=400",  # Beijing, China
+    "PVG": "https://images.unsplash.com/photo-1538428331393-2d2d2a235242?w=400",  # Shanghai, China
+    "HKG": "https://images.unsplash.com/photo-1513622790141-cf11e428787a?w=400",  # Hong Kong
+    "DEL": "https://images.unsplash.com/photo-1587474260584-136574528ed5?w=400",  # Delhi, India
+    "BOM": "https://images.unsplash.com/photo-1570168007204-dfb528c6958f?w=400",  # Mumbai, India
+    "DPS": "https://images.unsplash.com/photo-1537996194471-e657df97525p?w=400",  # Bali, Indonesia
+    "SGN": "https://images.unsplash.com/photo-1559592233-10d63b2c15a7?w=400",  # Ho Chi Minh City, Vietnam
+
+    # === Americas ===
+    "JFK": "https://images.unsplash.com/photo-1496442226666-8d4d0e62e6e9?w=400",  # New York, USA
+    "LAX": "https://images.unsplash.com/photo-1542065406-53817f5256e4?w=400",  # Los Angeles, USA
+    "MIA": "https://images.unsplash.com/photo-1533106418989-88406e758cae?w=400",  # Miami, USA
+    "YYZ": "https://images.unsplash.com/photo-1502444336025-108731b4586a?w=400",  # Toronto, Canada
+    "CUN": "https://images.unsplash.com/photo-1580592354376-a12803362145?w=400",  # Cancun, Mexico
+    "GRU": "https://images.unsplash.com/photo-1529260830199-42c24129f196?w=400",  # Sao Paulo, Brazil
 }
 
 
@@ -70,6 +118,121 @@ async def cache_set(key: str, value: any, ttl: int):
         )
     except Exception as e:
         logger.debug(f"Cache set failed: {e}")
+
+
+# async def fetch_popular_from_travelpayouts(
+#     origin: str = "TAS",
+#     limit: int = 10,
+#     period: str = "year"
+# ) -> List[dict]:
+#     """Fetch popular routes from Travelpayouts (always in USD)"""
+#     try:
+#         aggregated_url = "https://api.travelpayouts.com/v1/prices/cheap"
+        
+#         params = {
+#             "origin": origin.upper(),
+#             "currency": "USD",  # Always fetch in USD, convert later
+#             "token": settings.TRAVELPAYOUTS_API_TOKEN
+#         }
+        
+#         async with httpx.AsyncClient(timeout=15.0) as client:
+#             all_routes = []
+            
+#             for destination in POPULAR_INTERNATIONAL_DESTINATIONS[:15]:
+#                 dest_params = {**params, "destination": destination}
+                
+#                 try:
+#                     response = await client.get(aggregated_url, params=dest_params, timeout=5.0)
+                    
+#                     if response.status_code == 200:
+#                         dest_data = response.json()
+                        
+#                         if dest_data.get("success") and dest_data.get("data"):
+#                             flights = dest_data.get("data", {}).get(destination, [])
+                            
+#                             if flights and len(flights) > 0:
+#                                 cheapest = min(flights, key=lambda x: x.get("price", 999999))
+                                
+#                                 all_routes.append({
+#                                     "origin": origin.upper(),
+#                                     "destination": destination,
+#                                     "price": float(cheapest.get("price", 0)),
+#                                     "currency": "USD",
+#                                     "departure_date": cheapest.get("departure_at"),
+#                                     "return_date": cheapest.get("return_at"),
+#                                     "airline": cheapest.get("airline"),
+#                                     "flight_number": cheapest.get("flight_number"),
+#                                     "found_at": cheapest.get("created_at"),
+#                                     "image_url": DESTINATION_IMAGES.get(destination, "https://images.unsplash.com/photo-1436491865332-7a61a109cc05?w=400")
+#                                 })
+#                 except Exception as e:
+#                     logger.debug(f"Skipped {destination}: {e}")
+#                     continue
+            
+#             if all_routes:
+#                 all_routes.sort(key=lambda x: x["price"])
+#                 logger.info(f"Fetched {len(all_routes)} routes from Travelpayouts")
+#                 return all_routes[:limit]
+            
+#             # Fallback to latest prices endpoint
+#             logger.info("Falling back to latest prices endpoint")
+#             params = {
+#                 "origin": origin.upper(),
+#                 "currency": "USD",
+#                 "limit": 50,
+#                 "page": 1,
+#                 "sorting": "price",
+#                 "token": settings.TRAVELPAYOUTS_API_TOKEN
+#             }
+            
+#             response = await client.get(TRAVELPAYOUTS_API_URL, params=params)
+#             response.raise_for_status()
+            
+#             data = response.json()
+            
+#             if not data.get("success", False):
+#                 logger.warning(f"Travelpayouts API returned success=false")
+#                 return []
+            
+#             routes = []
+#             seen_destinations = set()
+            
+#             for item in data.get("data", []):
+#                 destination = item.get("destination")
+                
+#                 if destination in seen_destinations:
+#                     continue
+                
+#                 if destination not in POPULAR_INTERNATIONAL_DESTINATIONS:
+#                     continue
+                
+#                 seen_destinations.add(destination)
+                
+#                 routes.append({
+#                     "origin": origin.upper(),
+#                     "destination": destination,
+#                     "price": float(item.get("value", 0)),
+#                     "currency": "USD",
+#                     "departure_date": item.get("depart_date"),
+#                     "return_date": item.get("return_date"),
+#                     "airline": item.get("airline"),
+#                     "flight_number": item.get("flight_number"),
+#                     "found_at": item.get("found_at"),
+#                     "image_url": DESTINATION_IMAGES.get(destination, "https://images.unsplash.com/photo-1436491865332-7a61a109cc05?w=400")
+#                 })
+                
+#                 if len(routes) >= limit:
+#                     break
+            
+#             logger.info(f"Fetched {len(routes)} routes (fallback)")
+#             return routes
+            
+#     except httpx.HTTPError as e:
+#         logger.error(f"Travelpayouts API error: {e}")
+#         return []
+#     except Exception as e:
+#         logger.error(f"Error fetching from Travelpayouts: {e}")
+#         return []
 
 
 async def fetch_popular_from_travelpayouts(
@@ -115,7 +278,11 @@ async def fetch_popular_from_travelpayouts(
                                     "airline": cheapest.get("airline"),
                                     "flight_number": cheapest.get("flight_number"),
                                     "found_at": cheapest.get("created_at"),
-                                    "image_url": DESTINATION_IMAGES.get(destination, "https://images.unsplash.com/photo-1436491865332-7a61a109cc05?w=400")
+                                    # FIX: Use destination-specific image
+                                    "image_url": DESTINATION_IMAGES.get(
+                                        destination, 
+                                        "https://images.unsplash.com/photo-1436491865332-7a61a109cc05?w=400"
+                                    )
                                 })
                 except Exception as e:
                     logger.debug(f"Skipped {destination}: {e}")
@@ -170,7 +337,11 @@ async def fetch_popular_from_travelpayouts(
                     "airline": item.get("airline"),
                     "flight_number": item.get("flight_number"),
                     "found_at": item.get("found_at"),
-                    "image_url": DESTINATION_IMAGES.get(destination, "https://images.unsplash.com/photo-1436491865332-7a61a109cc05?w=400")
+                    # FIX: Use destination-specific image here too!
+                    "image_url": DESTINATION_IMAGES.get(
+                        destination, 
+                        "https://images.unsplash.com/photo-1436491865332-7a61a109cc05?w=400"
+                    )
                 })
                 
                 if len(routes) >= limit:
@@ -185,7 +356,6 @@ async def fetch_popular_from_travelpayouts(
     except Exception as e:
         logger.error(f"Error fetching from Travelpayouts: {e}")
         return []
-
 
 async def enrich_with_airport_data(routes: List[dict], db: AsyncSession) -> List[dict]:
     """Add airport names and countries"""
