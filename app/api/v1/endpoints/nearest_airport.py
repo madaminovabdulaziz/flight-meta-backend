@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 
 
 
-router = APIRouter(prefix="/api/v1", tags=["Location"])
+router = APIRouter()
 geo_service = IPGeolocationService()
 
 
