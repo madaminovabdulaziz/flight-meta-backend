@@ -179,7 +179,7 @@ def _parse_duration_to_minutes(duration_str: str) -> int:
             minutes = int(duration_str.replace('M', ''))
         
         return hours * 60 + minutes
-    except:
+    except (ValueError, AttributeError):
         return 0
 
 def _calculate_layover(prev_arrival: str, next_departure: str) -> Optional[str]:
@@ -202,7 +202,7 @@ def _calculate_layover(prev_arrival: str, next_departure: str) -> Optional[str]:
         elif minutes > 0:
             return f"PT{minutes}M"
         return None
-    except:
+    except (ValueError, AttributeError):
         return None
 
 # ---------------------------
@@ -417,7 +417,7 @@ def parse_flight_offers(data: Dict[str, Any]) -> List[Flight]:
             
             results.append(flight)
             
-        except Exception as e:
+        except (KeyError, IndexError) as e:
             logger.debug("Offer parse skipped: %s", e)
             continue
     
@@ -542,12 +542,12 @@ async def create_flight_order(priced_offer_data: Dict[str, Any], passengers: Lis
         await _cb_record_failure()
         raise
 
-
+# --- PERFORMANCE IMPROVEMENT HERE ---
 async def search_flexible_flights_amadeus(
-    origin: str, 
-    destination: str, 
-    duration_days: int, 
-    months: int = 2, 
+    origin: str,
+    destination: str,
+    duration_days: int,
+    months: int = 2,
     day_step: int = 3,
     adults: int = 1,
     children: int = 0,
@@ -555,7 +555,8 @@ async def search_flexible_flights_amadeus(
 ) -> List[Flight]:
     """
     Flexible search: iterate departure dates over a window (sampled every `day_step` days),
-    pair each with an implied return date (dep + duration_days), and collect options.
+    pair each with an implied return date (dep + duration_days), and collect options by
+    running all searches concurrently.
     """
     # Circuit breaker
     if await _cb_is_open():
@@ -568,38 +569,44 @@ async def search_flexible_flights_amadeus(
         logger.info("CACHE HIT %s", cache_key)
         return [Flight.model_validate(item) for item in cached]
 
-    logger.info("CACHE MISS %s -> iterating dates", cache_key)
+    logger.info("CACHE MISS %s -> gathering concurrent tasks", cache_key)
 
-    start = _now_utc().date() + timedelta(days=30)          # start ~1 month out
-    end = start + timedelta(days=30 * months)
+    start_date = _now_utc().date() + timedelta(days=30)  # start ~1 month out
+    end_date = start_date + timedelta(days=30 * months)
+    
+    # Create a list of all search tasks to run
+    tasks = []
+    current_date = start_date
+    while current_date < end_date:
+        dep_str = current_date.strftime("%Y-%m-%d")
+        ret_str = (current_date + timedelta(days=duration_days)).strftime("%Y-%m-%d")
+        
+        # Create a coroutine for each API call
+        task = search_flights_amadeus(
+            origin=origin,
+            destination=destination,
+            departure_date=dep_str,
+            return_date=ret_str,  # Round-trip for flexible search
+            adults=adults,
+            children=children,
+            cabin_class=cabin_class
+        )
+        tasks.append(task)
+        current_date += timedelta(days=day_step)
+
+    # Run all search tasks concurrently
+    # return_exceptions=True ensures that one failed task doesn't stop others
+    task_results = await asyncio.gather(*tasks, return_exceptions=True)
+
+    # Process results, filtering out any exceptions
     all_results: List[Flight] = []
+    for result in task_results:
+        if isinstance(result, list):
+            all_results.extend(result)
+        elif isinstance(result, Exception):
+            logger.warning("A flexible search sub-query failed: %s", result)
 
-    cur = start
-    while cur < end:
-        dep_str = cur.strftime("%Y-%m-%d")
-        ret_str = (cur + timedelta(days=duration_days)).strftime("%Y-%m-%d")
-        
-        try:
-            flights = await search_flights_amadeus(
-                origin=origin,
-                destination=destination,
-                departure_date=dep_str,
-                return_date=ret_str,  # Round-trip for flexible search
-                adults=adults,
-                children=children,
-                cabin_class=cabin_class
-            )
-            
-            all_results.extend(flights)
-                
-        except AmadeusTimeoutError:
-            logger.warning("Skipped %s due to provider timeout", dep_str)
-        except Exception as e:
-            logger.warning("Flexible search error on %s: %s", dep_str, e)
-        
-        cur += timedelta(days=day_step)
-
-    # Cache results
+    # Cache the final aggregated results
     await _zset(cache_key, [f.model_dump() for f in all_results], ttl=TTL_SEARCH)
-    logger.info(f"Flexible search found {len(all_results)} total options")
+    logger.info(f"Flexible search found {len(all_results)} total options from {len(tasks)} queries")
     return all_results
