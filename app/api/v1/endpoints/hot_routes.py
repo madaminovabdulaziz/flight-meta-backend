@@ -784,78 +784,78 @@ async def get_hot_routes(
 #         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 
-# def get_fallback_routes(origin: str = "TAS") -> List[dict]:
-#     """Fallback data for popular routes"""
-#     fallback = {
-#         "TAS": [
-#             {
-#                 "origin": "TAS", 
-#                 "destination": "IST", 
-#                 "price": 245.0, 
-#                 "currency": "USD", 
-#                 "airline": "TK",
-#                 "image_url": DESTINATION_IMAGES.get("IST")
-#             },
-#             {
-#                 "origin": "TAS", 
-#                 "destination": "DXB", 
-#                 "price": 298.0, 
-#                 "currency": "USD", 
-#                 "airline": "FZ",
-#                 "image_url": DESTINATION_IMAGES.get("DXB")
-#             },
-#             {
-#                 "origin": "TAS", 
-#                 "destination": "MOW", 
-#                 "price": 189.0, 
-#                 "currency": "USD", 
-#                 "airline": "HY",
-#                 "image_url": DESTINATION_IMAGES.get("MOW")
-#             },
-#             {
-#                 "origin": "TAS", 
-#                 "destination": "ICN", 
-#                 "price": 425.0, 
-#                 "currency": "USD", 
-#                 "airline": "KE",
-#                 "image_url": DESTINATION_IMAGES.get("ICN")
-#             },
-#             {
-#                 "origin": "TAS", 
-#                 "destination": "DEL", 
-#                 "price": 215.0, 
-#                 "currency": "USD", 
-#                 "airline": "HY",
-#                 "image_url": DESTINATION_IMAGES.get("DEL")
-#             },
-#             {
-#                 "origin": "TAS", 
-#                 "destination": "BKK", 
-#                 "price": 420.0, 
-#                 "currency": "USD", 
-#                 "airline": "HY",
-#                 "image_url": DESTINATION_IMAGES.get("BKK")
-#             },
-#             {
-#                 "origin": "TAS", 
-#                 "destination": "KUL", 
-#                 "price": 380.0, 
-#                 "currency": "USD", 
-#                 "airline": "HY",
-#                 "image_url": DESTINATION_IMAGES.get("KUL")
-#             },
-#             {
-#                 "origin": "TAS", 
-#                 "destination": "ALA", 
-#                 "price": 89.0, 
-#                 "currency": "USD", 
-#                 "airline": "HY",
-#                 "image_url": DESTINATION_IMAGES.get("ALA")
-#             },
-#         ]
-#     }
+def get_fallback_routes(origin: str = "TAS") -> List[dict]:
+    """Fallback data for popular routes"""
+    fallback = {
+        "TAS": [
+            {
+                "origin": "TAS", 
+                "destination": "IST", 
+                "price": 245.0, 
+                "currency": "USD", 
+                "airline": "TK",
+                "image_url": DESTINATION_IMAGES.get("IST")
+            },
+            {
+                "origin": "TAS", 
+                "destination": "DXB", 
+                "price": 298.0, 
+                "currency": "USD", 
+                "airline": "FZ",
+                "image_url": DESTINATION_IMAGES.get("DXB")
+            },
+            {
+                "origin": "TAS", 
+                "destination": "MOW", 
+                "price": 189.0, 
+                "currency": "USD", 
+                "airline": "HY",
+                "image_url": DESTINATION_IMAGES.get("MOW")
+            },
+            {
+                "origin": "TAS", 
+                "destination": "ICN", 
+                "price": 425.0, 
+                "currency": "USD", 
+                "airline": "KE",
+                "image_url": DESTINATION_IMAGES.get("ICN")
+            },
+            {
+                "origin": "TAS", 
+                "destination": "DEL", 
+                "price": 215.0, 
+                "currency": "USD", 
+                "airline": "HY",
+                "image_url": DESTINATION_IMAGES.get("DEL")
+            },
+            {
+                "origin": "TAS", 
+                "destination": "BKK", 
+                "price": 420.0, 
+                "currency": "USD", 
+                "airline": "HY",
+                "image_url": DESTINATION_IMAGES.get("BKK")
+            },
+            {
+                "origin": "TAS", 
+                "destination": "KUL", 
+                "price": 380.0, 
+                "currency": "USD", 
+                "airline": "HY",
+                "image_url": DESTINATION_IMAGES.get("KUL")
+            },
+            {
+                "origin": "TAS", 
+                "destination": "ALA", 
+                "price": 89.0, 
+                "currency": "USD", 
+                "airline": "HY",
+                "image_url": DESTINATION_IMAGES.get("ALA")
+            },
+        ]
+    }
     
-#     return fallback.get(origin.upper(), fallback["TAS"])
+    return fallback.get(origin.upper(), fallback["TAS"])
 
 
 
