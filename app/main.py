@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import asyncio
 from app.core.config import settings
 from app.db.database import engine, Base
-from app.api.v1.endpoints import flights, auth, clicks, airports, hot_routes, ai_search, popular_destinations, nearest_airport
+from app.api.v1.endpoints import flights, auth, hot_routes, nearest_airport
 
 async def create_db_and_tables():
     async with engine.begin() as conn:
@@ -73,7 +73,6 @@ app.include_router(flights.router, prefix=f"{settings.API_V1_STR}/flights", tags
 #app.include_router(ai_search.router, prefix=f"{settings.API_V1_STR}/ai-search", tags=["ai-search"])
 #app.include_router(clicks.router, prefix=f"{settings.API_V1_STR}/clicks", tags=["clicks"])
 app.include_router(hot_routes.router, prefix=f"{settings.API_V1_STR}/hot-routes", tags=["hot-routes"])
-app.include_router(popular_destinations.router, prefix=f"{settings.API_V1_STR}/popular-routes", tags=["popular-routes"])
 #app.include_router(airports.router, prefix=f"{settings.API_V1_STR}/airports", tags=["airports"])
 
 @app.get("/")
