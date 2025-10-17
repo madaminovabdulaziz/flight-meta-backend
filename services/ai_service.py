@@ -13,6 +13,7 @@ import logging
 from datetime import datetime, timedelta
 from typing import Dict, Any, Optional, List
 import asyncio
+import random
 
 import openai
 from app.core.config import settings
@@ -30,8 +31,8 @@ class AIFlightSearchService:
     """
     
     def __init__(self):
-        self.model = "gpt-4o"  # Best for function calling
-        self.conversation_history: Dict[str, List[Dict]] = {}
+        self.model = "gpt-4o-2024-08-06"  # Updated for better performance
+        self.conversation_history: Dict[str, List[Dict]] = {}  # Per user_id history
         
     def _get_function_schema(self) -> List[Dict[str, Any]]:
         """
@@ -54,7 +55,7 @@ class AIFlightSearchService:
                         },
                         "departure_date": {
                             "type": "string",
-                            "description": "Departure date in YYYY-MM-DD format. If user says 'next Friday', calculate the actual date."
+                            "description": "Departure date in YYYY-MM-DD format. If user says 'next Friday', calculate the actual date based on today's date."
                         },
                         "return_date": {
                             "type": "string",
@@ -84,7 +85,12 @@ class AIFlightSearchService:
                         },
                         "max_price": {
                             "type": "number",
-                            "description": "Maximum price in USD. Extract from phrases like 'under $300', 'cheap', 'budget'."
+                            "description": "Maximum price in USD. Extract from phrases like 'under $300', 'cheap', 'budget'. Convert from other currencies if mentioned (e.g., 250 EUR → approx USD)."
+                        },
+                        "currency": {
+                            "type": "string",
+                            "enum": ["USD", "EUR", "RUB", "UZS"],
+                            "description": "Detected currency. Default: USD"
                         },
                         "flexible_dates": {
                             "type": "boolean",
@@ -134,19 +140,36 @@ Default origin: Tashkent (TAS) - use this if user doesn't specify origin
 
 Your job:
 1. Extract flight search parameters from natural language queries
-2. Handle ambiguous dates ("next Friday" → calculate actual date)
-3. Understand price constraints ("cheap", "under $300", "budget")
+2. Handle ambiguous dates ("next Friday" → calculate actual date from today)
+3. Understand price constraints ("cheap", "under $300", "budget") and convert currencies (e.g., 250 EUR ≈ 270 USD, use approximate rates)
 4. Infer missing information with smart defaults
 5. Ask clarifying questions only when absolutely necessary
+6. Support multiple languages: English, Russian, Uzbek - detect and respond accordingly, but always output params in English
 
 Examples:
 - "Cheap flight to Dubai next week" → origin: TAS, destination: DXB, dates: next week range, max_price: infer "cheap"
 - "I need to be in Istanbul on the 25th" → destination: IST, arrival date: 25th of current/next month
 - "Weekend trip to Moscow" → round-trip, Friday-Sunday dates
 - "2 tickets to Seoul in November" → adults: 2, destination: ICN, month: November
+- "Дубайга арзон парвоз керак" → origin: TAS, destination: DXB, max_price: infer cheap
 
 Language support: English, Russian, Uzbek
 Be helpful, concise, and accurate."""
+    
+    async def _call_openai(self, **kwargs) -> Any:
+        """Wrapper for OpenAI call with custom retry logic."""
+        retries = 3
+        for attempt in range(retries):
+            try:
+                return await asyncio.to_thread(openai.chat.completions.create, **kwargs)
+            except openai.OpenAIError as e:
+                if attempt == retries - 1:
+                    logger.error(f"OpenAI call failed after {retries} attempts: {e}")
+                    raise
+                delay = (2 ** attempt) + random.uniform(0, 0.2)  # Exponential backoff with jitter
+                logger.warning(f"OpenAI retry {attempt + 1}/{retries} after error {e}, backing off {delay:.2f}s")
+                await asyncio.sleep(delay)
+        raise Exception("Max retries exceeded for OpenAI call")
     
     async def parse_query(
         self,
@@ -171,7 +194,9 @@ Be helpful, concise, and accurate."""
             # Build conversation context
             messages = [{"role": "system", "content": self._build_system_prompt()}]
             
-            if conversation_context:
+            if user_id and user_id in self.conversation_history:
+                messages.extend(self.conversation_history[user_id])
+            elif conversation_context:
                 messages.extend(conversation_context)
             
             messages.append({"role": "user", "content": query})
@@ -179,16 +204,24 @@ Be helpful, concise, and accurate."""
             # Call OpenAI with function calling
             logger.info(f"Parsing query: {query[:100]}...")
             
-            response = await asyncio.to_thread(
-                openai.chat.completions.create,
+            response = await self._call_openai(
                 model=self.model,
                 messages=messages,
                 functions=self._get_function_schema(),
                 function_call="auto",
-                temperature=0.3  # Lower temperature for more consistent extraction
+                temperature=0.3
             )
             
             message = response.choices[0].message
+            
+            # Update history if user_id provided
+            if user_id:
+                if user_id not in self.conversation_history:
+                    self.conversation_history[user_id] = []
+                self.conversation_history[user_id].append({"role": "user", "content": query})
+                self.conversation_history[user_id].append({"role": "assistant", "content": message.content})
+                # Limit history to last 10 exchanges
+                self.conversation_history[user_id] = self.conversation_history[user_id][-20:]
             
             # Check if AI wants to call a function
             if message.function_call:
@@ -222,11 +255,18 @@ Be helpful, concise, and accurate."""
                 "ai_response": message.content
             }
             
+        except openai.OpenAIError as e:
+            logger.error(f"OpenAI API error: {e}", exc_info=True)
+            return {
+                "success": False,
+                "error": f"AI service error: {str(e)}",
+                "fallback_to_traditional_search": True
+            }
         except Exception as e:
             logger.error(f"AI query parsing failed: {e}", exc_info=True)
             return {
                 "success": False,
-                "error": f"AI service error: {str(e)}",
+                "error": f"Unexpected error: {str(e)}",
                 "fallback_to_traditional_search": True
             }
     
@@ -238,12 +278,15 @@ Be helpful, concise, and accurate."""
         params = {}
         
         # IATA codes: ensure uppercase, 3 letters
-        params["origin"] = raw_params.get("origin", "TAS").upper()[:3]
-        params["destination"] = raw_params["destination"].upper()[:3]
+        origin = raw_params.get("origin", "TAS").upper()
+        params["origin"] = origin if self._is_valid_iata(origin) else "TAS"
+        
+        destination = raw_params["destination"].upper()
+        params["destination"] = destination if self._is_valid_iata(destination) else None
         
         # Dates
-        params["departure_date"] = raw_params["departure_date"]
-        params["return_date"] = raw_params.get("return_date")
+        params["departure_date"] = self._resolve_date(raw_params["departure_date"])
+        params["return_date"] = self._resolve_date(raw_params.get("return_date"))
         
         # Trip type
         params["trip_type"] = raw_params.get("trip_type", "round-trip")
@@ -258,9 +301,17 @@ Be helpful, concise, and accurate."""
         # Cabin class
         params["cabin_class"] = raw_params.get("cabin_class", "ECONOMY")
         
-        # Price constraints
-        if "max_price" in raw_params:
-            params["max_price"] = raw_params["max_price"]
+        # Price constraints with currency conversion
+        currency = raw_params.get("currency", "USD")
+        max_price = raw_params.get("max_price")
+        if max_price:
+            if currency == "EUR":
+                max_price *= 1.08
+            elif currency == "RUB":
+                max_price /= 90
+            elif currency == "UZS":
+                max_price /= 12000
+            params["max_price"] = max_price
         
         # Preferences
         params["flexible_dates"] = raw_params.get("flexible_dates", False)
@@ -271,6 +322,33 @@ Be helpful, concise, and accurate."""
         
         return params
     
+    def _is_valid_iata(self, code: str) -> bool:
+        """Basic IATA validation: 3 uppercase letters."""
+        return len(code) == 3 and code.isupper() and code.isalpha()
+    
+    def _resolve_date(self, date_str: Optional[str]) -> Optional[str]:
+        """Fallback to resolve relative dates like 'next Friday'."""
+        if not date_str:
+            return None
+        try:
+            datetime.strptime(date_str, "%Y-%m-%d")
+            return date_str
+        except ValueError:
+            pass
+        
+        today = datetime.now()
+        if "next friday" in date_str.lower():
+            days_to_friday = (4 - today.weekday()) % 7
+            if days_to_friday == 0:
+                days_to_friday = 7
+            return (today + timedelta(days=days_to_friday)).strftime("%Y-%m-%d")
+        elif "next week" in date_str.lower():
+            return (today + timedelta(days=7)).strftime("%Y-%m-%d")
+        elif "next month" in date_str.lower():
+            next_month = today.replace(day=1) + timedelta(days=32)
+            return next_month.replace(day=1).strftime("%Y-%m-%d")
+        return today.strftime("%Y-%m-%d")
+    
     async def refine_search(
         self,
         original_query: str,
@@ -279,10 +357,6 @@ Be helpful, concise, and accurate."""
     ) -> Dict[str, Any]:
         """
         Handle follow-up refinements like "make it cheaper" or "show business class".
-        
-        Example:
-            Original: "Flights to Dubai next week"
-            Refinement: "Actually, make it business class and non-stop only"
         """
         context = [
             {"role": "user", "content": original_query},
@@ -293,9 +367,8 @@ Be helpful, concise, and accurate."""
         result = await self.parse_query(refinement, conversation_context=context)
         
         if result.get("success"):
-            # Merge with previous params (new values override)
             updated_params = {**previous_params, **result["search_params"]}
-            result["search_params"] = updated_params
+            result["search_params"] = self._normalize_params(updated_params)
         
         return result
     
@@ -307,22 +380,16 @@ Be helpful, concise, and accurate."""
     ) -> str:
         """
         Generate natural language explanation of search results.
-        
-        Example:
-            "I found 15 flights to Dubai. The cheapest is $245 on FlyDubai (1 stop).
-            The fastest is $380 on Emirates (direct, 4h 30m). 
-            Best value: Turkish Airlines at $298 (1 stop, great airline)."
         """
         if not results:
             return "Sorry, I couldn't find any flights matching your criteria."
         
         try:
-            # Prepare summary for AI
             summary = {
                 "query": query,
                 "total_results": len(results),
-                "cheapest": min(results, key=lambda x: x["price"]),
-                "fastest": min(results, key=lambda x: x.get("duration_minutes", 999)),
+                "cheapest": min(results, key=lambda x: x["price"]) if results else None,
+                "fastest": min(results, key=lambda x: x.get("duration_minutes", 999)) if results else None,
                 "user_intent": user_intent
             }
             
@@ -339,9 +406,8 @@ Results:
 Write a friendly 2-3 sentence summary highlighting the best options based on what the user wants.
 Be conversational and helpful."""
             
-            response = await asyncio.to_thread(
-                openai.chat.completions.create,
-                model="gpt-4o-mini",  # Faster model for summaries
+            response = await self._call_openai(
+                model="gpt-4o-mini",
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.7,
                 max_tokens=150
@@ -353,7 +419,6 @@ Be conversational and helpful."""
             logger.error(f"Result explanation failed: {e}")
             return f"Found {len(results)} flights. Sort by price or duration to see the best options."
 
-
 # Singleton instance
 _ai_service = None
 
@@ -364,8 +429,6 @@ def get_ai_service() -> AIFlightSearchService:
         _ai_service = AIFlightSearchService()
     return _ai_service
 
-
-# Example usage and testing
 async def test_ai_service():
     """Test the AI service with sample queries."""
     ai = get_ai_service()
