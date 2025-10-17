@@ -181,29 +181,107 @@ def _parse_duration_to_minutes(duration_str: str) -> int:
         return hours * 60 + minutes
     except (ValueError, AttributeError):
         return 0
+    
+
+def _format_duration(duration_str: str) -> str:
+    """
+    Convert ISO 8601 duration (e.g., 'PT2H30M') to human-readable format (e.g., '2h 30m').
+    Returns the formatted string or original if parsing fails.
+    
+    Args:
+        duration_str: ISO 8601 duration string (e.g., 'PT2H30M', 'PT5H', 'PT45M')
+        
+    Returns:
+        Human-readable duration string (e.g., '2h 30m', '5h', '45m')
+        
+    Examples:
+        'PT2H30M' -> '2h 30m'
+        'PT5H' -> '5h'
+        'PT45M' -> '45m'
+        'PT0M' -> '0m'
+    """
+    try:
+        if not duration_str or not duration_str.startswith('PT'):
+            return duration_str  # Return as-is if not ISO format
+        
+        # Remove 'PT' prefix
+        duration_str = duration_str.replace('PT', '')
+        hours = 0
+        minutes = 0
+        
+        # Parse hours
+        if 'H' in duration_str:
+            parts = duration_str.split('H')
+            hours = int(parts[0])
+            duration_str = parts[1] if len(parts) > 1 else ''
+        
+        # Parse minutes
+        if 'M' in duration_str:
+            minutes = int(duration_str.replace('M', ''))
+        
+        # Format output
+        if hours > 0 and minutes > 0:
+            return f"{hours}h {minutes}m"
+        elif hours > 0:
+            return f"{hours}h"
+        elif minutes > 0:
+            return f"{minutes}m"
+        else:
+            return "0m"
+            
+    except (ValueError, AttributeError) as e:
+        logger.debug("Failed to format duration %s: %s", duration_str, e)
+        return duration_str  # Return original on error
+    
 
 def _calculate_layover(prev_arrival: str, next_departure: str) -> Optional[str]:
     """
     Calculate layover duration between two segments.
-    Returns ISO 8601 duration format (e.g., 'PT1H15M') or None.
+    Returns human-readable format (e.g., '1h 15m', '2h 30m', '45m') or None.
+    
+    Args:
+        prev_arrival: ISO 8601 datetime string of previous flight arrival
+        next_departure: ISO 8601 datetime string of next flight departure
+        
+    Returns:
+        Human-readable duration string or None if calculation fails
+        
+    Examples:
+        '2h 15m' for 2 hours 15 minutes layover
+        '3h' for exactly 3 hours
+        '45m' for 45 minutes
     """
     try:
+        # Parse datetime strings, handling both 'Z' and timezone formats
         prev_time = datetime.fromisoformat(prev_arrival.replace('Z', '+00:00'))
         next_time = datetime.fromisoformat(next_departure.replace('Z', '+00:00'))
+        
+        # Calculate time difference
         diff = next_time - prev_time
         
-        hours = diff.seconds // 3600
-        minutes = (diff.seconds % 3600) // 60
+        # Handle negative layover (data error)
+        if diff.total_seconds() < 0:
+            return None
         
+        # Extract hours and minutes
+        total_seconds = int(diff.total_seconds())
+        hours = total_seconds // 3600
+        minutes = (total_seconds % 3600) // 60
+        
+        # Format output based on duration
         if hours > 0 and minutes > 0:
-            return f"PT{hours}H{minutes}M"
+            return f"{hours}h {minutes}m"
         elif hours > 0:
-            return f"PT{hours}H"
+            return f"{hours}h"
         elif minutes > 0:
-            return f"PT{minutes}M"
+            return f"{minutes}m"
+        else:
+            return "0m"  # Same airport transfer or immediate connection
+            
+    except (ValueError, AttributeError, TypeError) as e:
+        logger.debug("Failed to calculate layover: %s", e)
         return None
-    except (ValueError, AttributeError):
-        return None
+
 
 # ---------------------------
 # OAuth token management
@@ -337,6 +415,7 @@ async def search_flights_amadeus(
 def _parse_itinerary(itinerary: Dict[str, Any], carriers: Dict[str, str]) -> FlightLeg:
     """
     Parse a single itinerary (outbound or return) into a FlightLeg with all segments.
+    All durations are converted to human-readable format (e.g., '2h 30m').
     """
     segments_data = itinerary.get("segments", [])
     
@@ -352,6 +431,9 @@ def _parse_itinerary(itinerary: Dict[str, Any], carriers: Dict[str, str]) -> Fli
                 seg["departure"]["at"]
             )
         
+        # Convert segment duration to human-readable format
+        segment_duration = _format_duration(seg.get("duration", ""))
+        
         segment = FlightSegment(
             departure_airport=seg["departure"]["iataCode"],
             departure_time=seg["departure"]["at"],
@@ -361,8 +443,8 @@ def _parse_itinerary(itinerary: Dict[str, Any], carriers: Dict[str, str]) -> Fli
             airline_code=seg["carrierCode"],
             flight_number=f"{seg['carrierCode']}{seg['number']}",
             aircraft=seg.get("aircraft", {}).get("code"),
-            duration=seg.get("duration", ""),
-            layover_duration=layover_duration
+            duration=segment_duration,  # ✅ Human-readable format
+            layover_duration=layover_duration  # ✅ Human-readable format
         )
         parsed_segments.append(segment)
     
@@ -370,16 +452,18 @@ def _parse_itinerary(itinerary: Dict[str, Any], carriers: Dict[str, str]) -> Fli
     first_seg = segments_data[0]
     last_seg = segments_data[-1]
     
+    # Convert leg duration to human-readable format
+    leg_duration = _format_duration(itinerary.get("duration", ""))
+    
     return FlightLeg(
         departure_airport=first_seg["departure"]["iataCode"],
         departure_time=first_seg["departure"]["at"],
         arrival_airport=last_seg["arrival"]["iataCode"],
         arrival_time=last_seg["arrival"]["at"],
-        duration=itinerary.get("duration", ""),
+        duration=leg_duration,  # ✅ Human-readable format
         stops=max(len(segments_data) - 1, 0),
         segments=parsed_segments
     )
-
 
 def parse_flight_offers(data: Dict[str, Any]) -> List[Flight]:
     """
@@ -475,7 +559,7 @@ async def price_flight_offer(flight_offer: Dict[str, Any]) -> Dict[str, Any]:
     client = await _get_httpx_client()
 
     try:
-        resp = await client.post("https://test.api.amadeus.com/v1/shopping/flight-offers/pricing", headers=headers, json=payload)
+        resp = await client.post("https://test.api.amadeus.com/v2/shopping/flight-offers/", headers=headers, json=payload)
         resp.raise_for_status()
         await _cb_record_success()
         return resp.json()
@@ -531,7 +615,7 @@ async def create_flight_order(priced_offer_data: Dict[str, Any], passengers: Lis
 
     client = await _get_httpx_client()
     try:
-        resp = await client.post("https://test.api.amadeus.com/v1/booking/flight-orders", headers=headers, json=payload)
+        resp = await client.post("https://test.api.amadeus.com/v2/booking/flight-orders", headers=headers, json=payload)
         if resp.status_code != 201:
             await _cb_record_failure()
             logger.error("Booking failed: %s %s", resp.status_code, resp.text[:800])

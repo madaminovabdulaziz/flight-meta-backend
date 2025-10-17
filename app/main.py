@@ -70,7 +70,6 @@ app.add_middleware(
 app.include_router(auth.router, prefix=f"{settings.API_V1_STR}/auth", tags=["auth"])
 app.include_router(nearest_airport.router, prefix=f"{settings.API_V1_STR}/nearest-airport", tags=["nearest airport"])
 app.include_router(flights.router, prefix=f"{settings.API_V1_STR}/flights", tags=["flights"])
-#app.include_router(ai_search.router, prefix=f"{settings.API_V1_STR}/ai-search", tags=["ai-search"])
 #app.include_router(clicks.router, prefix=f"{settings.API_V1_STR}/clicks", tags=["clicks"])
 app.include_router(hot_routes.router, prefix=f"{settings.API_V1_STR}/hot-routes", tags=["hot-routes"])
 #app.include_router(airports.router, prefix=f"{settings.API_V1_STR}/airports", tags=["airports"])
