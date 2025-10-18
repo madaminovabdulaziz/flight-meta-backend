@@ -1,11 +1,17 @@
 # services/ai_service.py
 """
-AI-Powered Flight Search Service
+AI-Powered Flight Search Service - PRODUCTION READY
 Converts natural language queries into structured flight search parameters.
 
 Example:
     "I need a cheap flight to Dubai next Friday under $300"
-    → {origin: "TAS", destination: "DXB", date: "2025-10-17", max_price: 300}
+    → {origin: "TAS", destination: "DXB", date: "2025-10-24", max_price: 300}
+    
+Fixes Applied:
+- Updated to OpenAI tool_calls API (not deprecated function_call)
+- Added IATA validation with clarification requests
+- Fixed user_intent enum to match Amadeus expectations
+- Enhanced error handling and logging
 """
 
 import json
@@ -30,13 +36,31 @@ class AIFlightSearchService:
     Uses OpenAI's function calling for reliable parameter extraction.
     """
     
+    # Extended IATA Database (In production, use Redis cache + DB)
+    _CITY_TO_IATA = {
+        "tashkent": "TAS", "dubai": "DXB", "moscow": "SVO", "domodedovo": "DME",
+        "istanbul": "IST", "london": "LHR", "heathrow": "LHR", "gatwick": "LGW",
+        "seoul": "ICN", "incheon": "ICN", "new york": "JFK", "nyc": "JFK",
+        "paris": "CDG", "singapore": "SIN", "tokyo": "NRT", "narita": "NRT",
+        "beijing": "PEK", "shanghai": "PVG", "hong kong": "HKG",
+        "los angeles": "LAX", "san francisco": "SFO", "chicago": "ORD",
+        "miami": "MIA", "delhi": "DEL", "mumbai": "BOM", "bangkok": "BKK",
+        "kuala lumpur": "KUL", "jakarta": "CGK", "manila": "MNL",
+        "samarkand": "SKD", "bukhara": "BHK", "urgench": "UGC", "namangan": "NMA",
+        "almaty": "ALA", "astana": "NQZ", "baku": "GYD", "tbilisi": "TBS",
+        "yerevan": "EVN", "tehran": "IKA", "riyadh": "RUH", "jeddah": "JED",
+        "cairo": "CAI", "casablanca": "CMN", "johannesburg": "JNB",
+        "sydney": "SYD", "melbourne": "MEL", "auckland": "AKL"
+    }
+    
     def __init__(self):
-        self.model = "gpt-4o-2024-08-06"  # Updated for better performance
-        self.conversation_history: Dict[str, List[Dict]] = {}  # Per user_id history
+        self.model = getattr(settings, 'OPENAI_MODEL', 'gpt-4o-mini')
+        self.conversation_history: Dict[str, List[Dict]] = {}
         
     def _get_function_schema(self) -> List[Dict[str, Any]]:
         """
         Define the function schema for OpenAI to extract flight parameters.
+        Updated to match Amadeus API expectations.
         """
         return [
             {
@@ -47,15 +71,15 @@ class AIFlightSearchService:
                     "properties": {
                         "origin": {
                             "type": "string",
-                            "description": "Origin airport IATA code (3 letters). If not specified, default to TAS (Tashkent)."
+                            "description": "Origin city name (e.g., 'Tashkent'). If not specified, default to Tashkent."
                         },
                         "destination": {
                             "type": "string",
-                            "description": "Destination airport IATA code (3 letters). Required."
+                            "description": "Destination city name (e.g., 'Dubai'). REQUIRED."
                         },
                         "departure_date": {
                             "type": "string",
-                            "description": "Departure date in YYYY-MM-DD format. If user says 'next Friday', calculate the actual date based on today's date."
+                            "description": "Departure date in YYYY-MM-DD format. Calculate actual date from relative phrases like 'next Friday'."
                         },
                         "return_date": {
                             "type": "string",
@@ -64,7 +88,7 @@ class AIFlightSearchService:
                         "trip_type": {
                             "type": "string",
                             "enum": ["one-way", "round-trip"],
-                            "description": "Type of trip. Default to round-trip unless specified."
+                            "description": "Type of trip. Default to round-trip unless clearly one-way."
                         },
                         "adults": {
                             "type": "integer",
@@ -85,24 +109,25 @@ class AIFlightSearchService:
                         },
                         "max_price": {
                             "type": "number",
-                            "description": "Maximum price in USD. Extract from phrases like 'under $300', 'cheap', 'budget'. Convert from other currencies if mentioned (e.g., 250 EUR → approx USD)."
+                            "description": "Maximum price in USD. Extract from 'under $300', 'cheap', 'budget'. Convert currencies."
                         },
                         "currency": {
                             "type": "string",
                             "enum": ["USD", "EUR", "RUB", "UZS"],
-                            "description": "Detected currency. Default: USD"
+                            "description": "Currency code. Default: USD"
                         },
                         "flexible_dates": {
                             "type": "boolean",
-                            "description": "True if user wants to see prices for nearby dates. Keywords: 'flexible', 'around', 'sometime'."
+                            "description": "True if user wants nearby dates. Keywords: 'flexible', 'around', 'sometime'."
                         },
                         "non_stop": {
                             "type": "boolean",
-                            "description": "True if user prefers direct flights only. Default: false"
+                            "description": "True for direct flights only. Default: false"
                         },
                         "user_intent": {
                             "type": "string",
-                            "description": "The user's primary goal: 'find_cheapest', 'find_fastest', 'find_best_value', 'compare_options'"
+                            "enum": ["find_cheapest", "find_fastest", "find_best_value", "compare_options"],
+                            "description": "User's primary goal: cheapest price, fastest time, best value, or compare options"
                         }
                     },
                     "required": ["destination", "departure_date"]
@@ -116,11 +141,11 @@ class AIFlightSearchService:
                     "properties": {
                         "question": {
                             "type": "string",
-                            "description": "The clarification question to ask the user"
+                            "description": "The clarification question to ask"
                         },
                         "missing_field": {
                             "type": "string",
-                            "description": "Which parameter needs clarification: origin, destination, date, passengers, etc."
+                            "description": "Which parameter needs clarification"
                         }
                     },
                     "required": ["question", "missing_field"]
@@ -129,35 +154,38 @@ class AIFlightSearchService:
         ]
     
     def _build_system_prompt(self) -> str:
-        """
-        System prompt that teaches the AI how to understand flight queries.
-        """
+        """System prompt for flight search understanding."""
         today = datetime.now().strftime("%Y-%m-%d")
-        return f"""You are an AI flight search assistant for SkySearch AI, helping users find the perfect flights.
+        return f"""You are an AI flight search assistant for SkySearch AI.
 
 Today's date: {today}
-Default origin: Tashkent (TAS) - use this if user doesn't specify origin
+Default origin: Tashkent (use if user doesn't specify)
 
 Your job:
-1. Extract flight search parameters from natural language queries
-2. Handle ambiguous dates ("next Friday" → calculate actual date from today)
-3. Understand price constraints ("cheap", "under $300", "budget") and convert currencies (e.g., 250 EUR ≈ 270 USD, use approximate rates)
-4. Infer missing information with smart defaults
-5. Ask clarifying questions only when absolutely necessary
-6. Support multiple languages: English, Russian, Uzbek - detect and respond accordingly, but always output params in English
+1. Extract flight parameters from natural language
+2. Output CITY NAMES (not IATA codes) - backend handles conversion
+3. Calculate exact dates from relative phrases ("next Friday" → actual date)
+4. Understand price constraints and convert currencies
+5. Infer missing info with smart defaults
+6. Ask clarifying questions ONLY when absolutely necessary
+7. Support multiple languages (English, Russian, Uzbek)
+
+User Intent Detection:
+- "cheapest", "budget", "lowest price" → find_cheapest
+- "fastest", "quickest", "shortest time" → find_fastest
+- "best deal", "good value" → find_best_value
+- "show me options", "compare" → compare_options
 
 Examples:
-- "Cheap flight to Dubai next week" → origin: TAS, destination: DXB, dates: next week range, max_price: infer "cheap"
-- "I need to be in Istanbul on the 25th" → destination: IST, arrival date: 25th of current/next month
-- "Weekend trip to Moscow" → round-trip, Friday-Sunday dates
-- "2 tickets to Seoul in November" → adults: 2, destination: ICN, month: November
-- "Дубайга арзон парвоз керак" → origin: TAS, destination: DXB, max_price: infer cheap
+✓ "Cheap flight to Dubai next week" → destination: Dubai, dates: next week range, user_intent: find_cheapest
+✓ "I need to be in Istanbul on the 25th" → destination: Istanbul, departure_date: 2025-10-25, trip_type: one-way
+✓ "Weekend trip to Moscow" → round-trip, Friday-Sunday, destination: Moscow
+✓ "2 tickets to Seoul in November under 500 bucks" → adults: 2, destination: Seoul, month: November, max_price: 500
 
-Language support: English, Russian, Uzbek
-Be helpful, concise, and accurate."""
+Be helpful, accurate, and conversational."""
     
     async def _call_openai(self, **kwargs) -> Any:
-        """Wrapper for OpenAI call with custom retry logic."""
+        """Wrapper for OpenAI with retry logic."""
         retries = 3
         for attempt in range(retries):
             try:
@@ -166,10 +194,10 @@ Be helpful, concise, and accurate."""
                 if attempt == retries - 1:
                     logger.error(f"OpenAI call failed after {retries} attempts: {e}")
                     raise
-                delay = (2 ** attempt) + random.uniform(0, 0.2)  # Exponential backoff with jitter
-                logger.warning(f"OpenAI retry {attempt + 1}/{retries} after error {e}, backing off {delay:.2f}s")
+                delay = (2 ** attempt) + random.uniform(0, 0.2)
+                logger.warning(f"OpenAI retry {attempt + 1}/{retries} after {e}, backoff {delay:.2f}s")
                 await asyncio.sleep(delay)
-        raise Exception("Max retries exceeded for OpenAI call")
+        raise Exception("Max retries exceeded for OpenAI")
     
     async def parse_query(
         self,
@@ -180,15 +208,10 @@ Be helpful, concise, and accurate."""
         """
         Parse natural language query into structured flight search parameters.
         
-        Args:
-            query: User's natural language query
-            user_id: Optional user ID for conversation tracking
-            conversation_context: Previous messages in conversation
-        
         Returns:
             Dict with either:
-            - search_params: Structured parameters for flight search
-            - clarification_needed: Question to ask user
+            - success=True, search_params: Structured parameters
+            - success=False, needs_clarification: Question to ask user
         """
         try:
             # Build conversation context
@@ -201,46 +224,78 @@ Be helpful, concise, and accurate."""
             
             messages.append({"role": "user", "content": query})
             
-            # Call OpenAI with function calling
             logger.info(f"Parsing query: {query[:100]}...")
             
+            # Call OpenAI with tool calling
             response = await self._call_openai(
                 model=self.model,
                 messages=messages,
-                functions=self._get_function_schema(),
-                function_call="auto",
+                tools=[{"type": "function", "function": f} for f in self._get_function_schema()],
+                tool_choice="auto",
                 temperature=0.3
             )
             
             message = response.choices[0].message
             
-            # Update history if user_id provided
+            # Update conversation history
             if user_id:
                 if user_id not in self.conversation_history:
                     self.conversation_history[user_id] = []
+                
                 self.conversation_history[user_id].append({"role": "user", "content": query})
-                self.conversation_history[user_id].append({"role": "assistant", "content": message.content})
-                # Limit history to last 10 exchanges
+                
+                # Store assistant response
+                if message.tool_calls:
+                    self.conversation_history[user_id].append({
+                        "role": "assistant",
+                        "content": message.content,
+                        "tool_calls": [
+                            {
+                                "id": tc.id,
+                                "type": "function",
+                                "function": {
+                                    "name": tc.function.name,
+                                    "arguments": tc.function.arguments
+                                }
+                            } for tc in message.tool_calls
+                        ]
+                    })
+                elif message.content:
+                    self.conversation_history[user_id].append({
+                        "role": "assistant",
+                        "content": message.content
+                    })
+                
+                # Keep last 20 messages
                 self.conversation_history[user_id] = self.conversation_history[user_id][-20:]
             
-            # Check if AI wants to call a function
-            if message.function_call:
-                function_name = message.function_call.name
-                function_args = json.loads(message.function_call.arguments)
+            # Process tool calls
+            if message.tool_calls:
+                tool_call = message.tool_calls[0]
+                function_name = tool_call.function.name
+                function_args = json.loads(tool_call.function.arguments)
                 
                 if function_name == "search_flights":
-                    # Successfully extracted search parameters
-                    params = self._normalize_params(function_args)
+                    # Normalize and validate parameters
+                    try:
+                        params = self._normalize_params(function_args)
+                    except ValueError as e:
+                        # IATA resolution failed - ask for clarification
+                        return {
+                            "success": False,
+                            "needs_clarification": True,
+                            "question": str(e),
+                            "missing_field": "destination"
+                        }
                     
                     return {
                         "success": True,
                         "search_params": params,
-                        "ai_interpretation": message.content or "Understood!",
+                        "ai_interpretation": message.content or "Understood your search request.",
                         "needs_clarification": False
                     }
                 
                 elif function_name == "ask_clarification":
-                    # AI needs more information
                     return {
                         "success": False,
                         "needs_clarification": True,
@@ -251,8 +306,8 @@ Be helpful, concise, and accurate."""
             # Fallback: AI couldn't extract parameters
             return {
                 "success": False,
-                "error": "Could not understand query. Please be more specific.",
-                "ai_response": message.content
+                "error": "Could not extract flight parameters.",
+                "ai_response": message.content or "Please try rephrasing your search query."
             }
             
         except openai.OpenAIError as e:
@@ -269,20 +324,50 @@ Be helpful, concise, and accurate."""
                 "error": f"Unexpected error: {str(e)}",
                 "fallback_to_traditional_search": True
             }
-    
+
+    def _resolve_city_to_iata(self, city_name: str) -> Optional[str]:
+        """
+        Convert city name to IATA code with validation.
+        Returns None if city cannot be resolved.
+        """
+        normalized_name = city_name.lower().strip()
+        
+        # Direct match
+        iata_code = self._CITY_TO_IATA.get(normalized_name)
+        if iata_code:
+            return iata_code
+        
+        # Partial match
+        for city, iata in self._CITY_TO_IATA.items():
+            if normalized_name in city or city in normalized_name:
+                logger.info(f"Partial match: '{city_name}' → {city} ({iata})")
+                return iata
+        
+        logger.warning(f"Could not resolve city: '{city_name}'")
+        return None
+
     def _normalize_params(self, raw_params: Dict[str, Any]) -> Dict[str, Any]:
         """
         Normalize and validate extracted parameters.
-        Apply smart defaults and date calculations.
+        Raises ValueError if critical parameters cannot be resolved.
         """
         params = {}
         
-        # IATA codes: ensure uppercase, 3 letters
-        origin = raw_params.get("origin", "TAS").upper()
-        params["origin"] = origin if self._is_valid_iata(origin) else "TAS"
+        # Origin (with fallback)
+        origin_city = raw_params.get("origin", "Tashkent")
+        params["origin"] = self._resolve_city_to_iata(origin_city)
+        if not params["origin"]:
+            logger.warning(f"Origin '{origin_city}' not found, defaulting to TAS")
+            params["origin"] = "TAS"
         
-        destination = raw_params["destination"].upper()
-        params["destination"] = destination if self._is_valid_iata(destination) else None
+        # Destination (REQUIRED)
+        destination_city = raw_params["destination"]
+        params["destination"] = self._resolve_city_to_iata(destination_city)
+        if not params["destination"]:
+            raise ValueError(
+                f"I couldn't find the airport for '{destination_city}'. "
+                f"Could you specify a different city or provide the 3-letter airport code?"
+            )
         
         # Dates
         params["departure_date"] = self._resolve_date(raw_params["departure_date"])
@@ -301,52 +386,64 @@ Be helpful, concise, and accurate."""
         # Cabin class
         params["cabin_class"] = raw_params.get("cabin_class", "ECONOMY")
         
-        # Price constraints with currency conversion
+        # Price with currency conversion
         currency = raw_params.get("currency", "USD")
         max_price = raw_params.get("max_price")
         if max_price:
-            if currency == "EUR":
-                max_price *= 1.08
-            elif currency == "RUB":
-                max_price /= 90
-            elif currency == "UZS":
-                max_price /= 12000
-            params["max_price"] = max_price
+            # Simplified conversion rates
+            conversion_rates = {
+                "EUR": 1.08, "RUB": 0.011, "UZS": 0.000083
+            }
+            if currency != "USD":
+                max_price *= conversion_rates.get(currency, 1.0)
+            params["max_price"] = round(max_price, 2)
+        else:
+            params["max_price"] = None
+        
+        params["currency"] = "USD"  # Always normalize to USD
         
         # Preferences
         params["flexible_dates"] = raw_params.get("flexible_dates", False)
         params["non_stop"] = raw_params.get("non_stop", False)
         
-        # User intent
+        # User intent (already in correct format from AI)
         params["user_intent"] = raw_params.get("user_intent", "find_best_value")
         
         return params
     
-    def _is_valid_iata(self, code: str) -> bool:
-        """Basic IATA validation: 3 uppercase letters."""
-        return len(code) == 3 and code.isupper() and code.isalpha()
-    
     def _resolve_date(self, date_str: Optional[str]) -> Optional[str]:
-        """Fallback to resolve relative dates like 'next Friday'."""
+        """Resolve relative dates to YYYY-MM-DD format."""
         if not date_str:
             return None
+        
+        # Try parsing as YYYY-MM-DD
         try:
             datetime.strptime(date_str, "%Y-%m-%d")
             return date_str
         except ValueError:
             pass
         
+        # Handle relative dates
         today = datetime.now()
-        if "next friday" in date_str.lower():
-            days_to_friday = (4 - today.weekday()) % 7
-            if days_to_friday == 0:
-                days_to_friday = 7
-            return (today + timedelta(days=days_to_friday)).strftime("%Y-%m-%d")
-        elif "next week" in date_str.lower():
+        
+        # Next weekday
+        day_names = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
+        for i, name in enumerate(day_names):
+            if f"next {name}" in date_str.lower():
+                days_ahead = (i - today.weekday()) % 7
+                if days_ahead <= 0:
+                    days_ahead += 7
+                return (today + timedelta(days=days_ahead)).strftime("%Y-%m-%d")
+        
+        # Next week/month
+        if "next week" in date_str.lower():
             return (today + timedelta(days=7)).strftime("%Y-%m-%d")
         elif "next month" in date_str.lower():
             next_month = today.replace(day=1) + timedelta(days=32)
             return next_month.replace(day=1).strftime("%Y-%m-%d")
+        
+        # Fallback
+        logger.warning(f"Could not resolve date '{date_str}', using today")
         return today.strftime("%Y-%m-%d")
     
     async def refine_search(
@@ -355,20 +452,19 @@ Be helpful, concise, and accurate."""
         refinement: str,
         previous_params: Dict[str, Any]
     ) -> Dict[str, Any]:
-        """
-        Handle follow-up refinements like "make it cheaper" or "show business class".
-        """
+        """Handle follow-up refinements like 'make it cheaper' or 'show business class'."""
         context = [
             {"role": "user", "content": original_query},
-            {"role": "assistant", "content": f"Found flights with: {json.dumps(previous_params)}"},
+            {"role": "assistant", "content": f"Previous search: {json.dumps(previous_params)}"},
             {"role": "user", "content": refinement}
         ]
         
         result = await self.parse_query(refinement, conversation_context=context)
         
         if result.get("success"):
+            # Merge old and new params
             updated_params = {**previous_params, **result["search_params"]}
-            result["search_params"] = self._normalize_params(updated_params)
+            result["search_params"] = updated_params
         
         return result
     
@@ -378,33 +474,30 @@ Be helpful, concise, and accurate."""
         results: List[Dict[str, Any]],
         user_intent: str = "find_best_value"
     ) -> str:
-        """
-        Generate natural language explanation of search results.
-        """
+        """Generate natural language explanation of search results."""
         if not results:
-            return "Sorry, I couldn't find any flights matching your criteria."
+            return "Sorry, I couldn't find any flights matching your criteria. Try adjusting your dates or preferences."
         
         try:
-            summary = {
-                "query": query,
-                "total_results": len(results),
-                "cheapest": min(results, key=lambda x: x["price"]) if results else None,
-                "fastest": min(results, key=lambda x: x.get("duration_minutes", 999)) if results else None,
-                "user_intent": user_intent
-            }
+            cheapest = min(results, key=lambda x: x["price"])
+            fastest = min(results, key=lambda x: x.get("duration_minutes", 999))
             
-            prompt = f"""Based on this flight search, provide a concise, helpful summary:
+            result_summary = json.dumps(results[:5], indent=2)[:1000]  # Limit size
+            
+            prompt = f"""Summarize these flight search results conversationally.
 
-Query: {query}
-User wants: {user_intent}
+User Query: {query}
+User Intent: {user_intent}
+Total Results: {len(results)}
 
-Results:
-- Total flights found: {summary['total_results']}
-- Cheapest: ${summary['cheapest']['price']} ({summary['cheapest'].get('airline', 'Unknown')})
-- Fastest: {summary['fastest'].get('duration', 'Unknown')} ({summary['fastest'].get('airline', 'Unknown')})
+Top Results (first 5):
+{result_summary}
 
-Write a friendly 2-3 sentence summary highlighting the best options based on what the user wants.
-Be conversational and helpful."""
+Key Stats:
+- Cheapest: ${cheapest['price']:.2f}
+- Fastest: {fastest.get('duration', 'N/A')}
+
+Write a friendly 2-3 sentence summary highlighting the best options based on user intent. Be specific about prices."""
             
             response = await self._call_openai(
                 model="gpt-4o-mini",
@@ -417,7 +510,8 @@ Be conversational and helpful."""
             
         except Exception as e:
             logger.error(f"Result explanation failed: {e}")
-            return f"Found {len(results)} flights. Sort by price or duration to see the best options."
+            return f"Found {len(results)} flights starting from ${min(r['price'] for r in results):.2f}."
+
 
 # Singleton instance
 _ai_service = None
@@ -428,23 +522,3 @@ def get_ai_service() -> AIFlightSearchService:
     if _ai_service is None:
         _ai_service = AIFlightSearchService()
     return _ai_service
-
-async def test_ai_service():
-    """Test the AI service with sample queries."""
-    ai = get_ai_service()
-    
-    test_queries = [
-        "I need a cheap flight to Dubai next Friday",
-        "Покажи мне рейсы в Москву на следующей неделе",
-        "Istanbulga 2 ta chipta kerak",
-        "Weekend trip to Seoul for 2 people in November",
-        "Business class to London, leaving December 15th",
-    ]
-    
-    for query in test_queries:
-        print(f"\n{'='*60}")
-        print(f"Query: {query}")
-        print(f"{'='*60}")
-        
-        result = await ai.parse_query(query)
-        print(json.dumps(result, indent=2, ensure_ascii=False))

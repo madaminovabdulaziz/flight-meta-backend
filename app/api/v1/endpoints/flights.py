@@ -1,4 +1,10 @@
-from fastapi import APIRouter, Query, HTTPException, Path, Depends
+# app/api/v1/endpoints/flights.py
+"""
+Flight Search Endpoints - Production Ready
+Supports both AI-powered conversational search and traditional parameter-based search.
+"""
+
+from fastapi import APIRouter, Query, HTTPException, Path, Depends, Body
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timedelta
 from enum import Enum
@@ -7,6 +13,7 @@ from services import amadeus_service
 from schemas.flight_segment import Flight
 from app.models.models import User
 from app.api.v1.dependencies import get_current_user
+from services.ai_service import get_ai_service, AIFlightSearchService
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -23,6 +30,12 @@ class CabinClass(str, Enum):
 class TripType(str, Enum):
     ONE_WAY = "one-way"
     ROUND_TRIP = "round-trip"
+
+class UserIntent(str, Enum):
+    CHEAPEST = "find_cheapest"
+    FASTEST = "find_fastest"
+    BEST_VALUE = "find_best_value"
+    COMPARE = "compare_options"
 
 def validate_date(date_str: str, field_name: str) -> datetime:
     """Validate and parse date string"""
@@ -48,6 +61,128 @@ def validate_iata_code(code: str, field_name: str) -> str:
             detail=f"{field_name} must be a valid 3-letter IATA code"
         )
     return code.upper()
+
+
+# ==================== AI-POWERED SEARCH ====================
+
+@router.post("/search/ai", response_model=Dict[str, Any])
+async def search_flights_ai(
+    query: str = Body(
+        ...,
+        description="Natural language query for flight search",
+        example="I want a cheap, non-stop flight to Dubai next Friday under $400"
+    ),
+    user_id: Optional[str] = Body(
+        None, 
+        description="Optional user ID for conversation context"
+    ),
+    ai_service: AIFlightSearchService = Depends(get_ai_service)
+):
+    """
+    AI-Powered Conversational Flight Search
+    
+    Translates natural language into structured search and returns results.
+    Handles conversation state for follow-up questions.
+    
+    Examples:
+    - "Cheap tickets to Dubai next month"
+    - "I need to be in Istanbul on November 25th"
+    - "Weekend trip to Moscow for 2 people"
+    - "Show me business class flights to Seoul"
+    """
+    logger.info(f"AI Search Query from user {user_id}: {query}")
+    
+    # Parse query using AI service
+    ai_result = await ai_service.parse_query(query, user_id=user_id)
+    
+    # Handle clarification requests
+    if not ai_result.get("success"):
+        if ai_result.get("needs_clarification"):
+            return {
+                "status": "clarification_needed",
+                "question": ai_result["question"],
+                "missing_field": ai_result["missing_field"],
+                "ai_interpretation": ai_result.get("ai_response", "Please provide more details.")
+            }
+        else:
+            raise HTTPException(
+                status_code=422,
+                detail=ai_result.get("error", "Could not understand the search request. Please try rephrasing.")
+            )
+    
+    # Extract and validate structured parameters
+    params = ai_result["search_params"]
+    
+    # Backend validation (IATA codes and dates)
+    try:
+        origin_iata = validate_iata_code(params["origin"], "Origin")
+        destination_iata = validate_iata_code(params["destination"], "Destination")
+        
+        validate_date(params["departure_date"], "Departure date")
+        if params["return_date"]:
+            validate_date(params["return_date"], "Return date")
+             
+    except HTTPException as e:
+        return {
+            "status": "validation_failed",
+            "detail": e.detail,
+            "ai_interpretation": f"I found the parameters, but there was an issue: {e.detail}"
+        }
+
+    logger.info(f"Structured search parameters: {params}")
+
+    # Call Amadeus service
+    try:
+        # Choose search function based on flexibility
+        if params.get("flexible_dates"):
+            search_func = amadeus_service.search_flexible_flights_amadeus
+        else:
+            search_func = amadeus_service.search_flights_amadeus
+        
+        flights = await search_func(
+            origin=origin_iata,
+            destination=destination_iata,
+            departure_date=params["departure_date"],
+            return_date=params["return_date"],
+            adults=params["adults"],
+            children=params["children"],
+            infants=params["infants"],
+            cabin_class=params["cabin_class"],
+            non_stop=params["non_stop"],
+            currency=params.get("currency", "USD"),
+            max_price=params.get("max_price"),
+            user_intent=params["user_intent"]
+        )
+
+        # Generate AI summary
+        flights_dump = [f.model_dump() for f in flights]
+        summary = await ai_service.explain_results(query, flights_dump, params["user_intent"])
+
+        return {
+            "status": "success",
+            "ai_summary": summary,
+            "search_params_used": params,
+            "total_results": len(flights),
+            "results": flights
+        }
+
+    except amadeus_service.AmadeusTimeoutError as e:
+        logger.error(f"Amadeus timeout: {e}")
+        raise HTTPException(
+            status_code=504,
+            detail="Flight search timed out. Please try again."
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Unexpected error during Amadeus call: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail="An unexpected error occurred while processing the search."
+        )
+
+
+# ==================== TRADITIONAL SEARCH ====================
 
 @router.get("/search", response_model=List[Flight])
 async def search_flights(
@@ -113,6 +248,17 @@ async def search_flights(
         description="Search only non-stop flights"
     ),
     
+    # NEW: User intent and price filtering
+    user_intent: UserIntent = Query(
+        UserIntent.BEST_VALUE,
+        description="Search priority: cheapest, fastest, best value, or compare options"
+    ),
+    max_price: Optional[float] = Query(
+        None,
+        ge=0,
+        description="Maximum price in USD (optional price filter)"
+    ),
+    
     # Results control
     max_results: int = Query(
         20,
@@ -128,8 +274,10 @@ async def search_flights(
     )
 ):
     """
-    Search for flights with comprehensive filtering options.
-    Supports both one-way and round-trip searches.
+    Traditional Flight Search with Comprehensive Filtering
+    
+    Supports both one-way and round-trip searches with full parameter control.
+    Now includes user_intent and max_price for better result filtering.
     """
     try:
         # Validate IATA codes
@@ -187,11 +335,11 @@ async def search_flights(
         logger.info(
             f"Flight search: {origin}->{destination}, "
             f"Dep: {departure_date}, Type: {trip_type}, "
-            f"PAX: {adults}A/{children}C/{infants}I, Class: {cabin_class}"
+            f"PAX: {adults}A/{children}C/{infants}I, Class: {cabin_class}, "
+            f"Intent: {user_intent}, MaxPrice: {max_price}"
         )
         
-        # Call Amadeus service
-        # Note: You'll need to extend amadeus_service to handle these new parameters
+        # Call Amadeus service with ALL parameters including user_intent and max_price
         flights = await amadeus_service.search_flights_amadeus(
             origin=origin,
             destination=destination,
@@ -203,7 +351,9 @@ async def search_flights(
             cabin_class=cabin_class.value,
             non_stop=non_stop,
             max_results=max_results,
-            currency=currency.upper()
+            currency=currency.upper(),
+            max_price=max_price,  # NEW
+            user_intent=user_intent.value  # NEW
         )
         
         logger.info(f"Found {len(flights)} flights for {origin}->{destination}")
@@ -224,6 +374,8 @@ async def search_flights(
             detail="An error occurred while searching for flights"
         )
 
+
+# ==================== FLIGHT DETAILS ====================
 
 @router.get("/{flight_id}/details", response_model=Dict[str, Any])
 async def get_flight_details(
@@ -266,6 +418,8 @@ async def get_flight_details(
         )
 
 
+# ==================== FLEXIBLE DATE SEARCH ====================
+
 @router.get("/search/flexible", response_model=List[Flight])
 async def search_flights_flexible(
     origin: str = Query(
@@ -278,20 +432,28 @@ async def search_flights_flexible(
         description="Arrival airport IATA code",
         example="IST"
     ),
-    duration_days: int = Query(
-        ..., 
-        ge=1,
-        le=30,
-        description="Trip duration in days (1-30)",
-        example=7
+    departure_date: str = Query(
+        ...,
+        description="Target departure date (will search ±3 days)",
+        example="2025-11-15"
+    ),
+    return_date: Optional[str] = Query(
+        None,
+        description="Target return date (will search ±3 days if provided)",
+        example="2025-11-22"
     ),
     adults: int = Query(1, ge=1, le=8),
     children: int = Query(0, ge=0, le=8),
-    cabin_class: CabinClass = Query(CabinClass.ECONOMY)
+    infants: int = Query(0, ge=0, le=8),
+    cabin_class: CabinClass = Query(CabinClass.ECONOMY),
+    non_stop: bool = Query(False),
+    max_price: Optional[float] = Query(None, ge=0),
+    user_intent: UserIntent = Query(UserIntent.BEST_VALUE),
+    currency: str = Query("USD", min_length=3, max_length=3)
 ):
     """
-    Flexible date search: finds the cheapest flights for a given trip duration
-    across multiple departure dates.
+    Flexible date search: finds flights across multiple dates (±3 days).
+    Perfect for travelers with flexible schedules looking for the best deals.
     """
     try:
         # Validate IATA codes
@@ -304,19 +466,32 @@ async def search_flights_flexible(
                 detail="Origin and destination must be different"
             )
         
+        # Validate dates
+        validate_date(departure_date, "Departure date")
+        if return_date:
+            validate_date(return_date, "Return date")
+        
         logger.info(
             f"Flexible search: {origin}->{destination}, "
-            f"Duration: {duration_days}d, PAX: {adults}A/{children}C"
+            f"Dep: {departure_date}±3d, PAX: {adults}A/{children}C/{infants}I, "
+            f"Intent: {user_intent}"
         )
         
         flights = await amadeus_service.search_flexible_flights_amadeus(
             origin=origin,
             destination=destination,
-            duration_days=duration_days
+            departure_date=departure_date,
+            return_date=return_date,
+            flexible_dates=True,
+            adults=adults,
+            children=children,
+            infants=infants,
+            cabin_class=cabin_class.value,
+            non_stop=non_stop,
+            currency=currency.upper(),
+            max_price=max_price,
+            user_intent=user_intent.value
         )
-        
-        # Sort by price ascending for flexible search
-        flights.sort(key=lambda f: f.price)
         
         logger.info(f"Flexible search returned {len(flights)} options")
         return flights
@@ -335,96 +510,15 @@ async def search_flights_flexible(
         )
 
 
+# ==================== MULTI-CITY (PLACEHOLDER) ====================
+
 @router.get("/search/multi-city", response_model=Dict[str, Any])
-async def search_multi_city_flights(
-    # This is a placeholder for future multi-city functionality
-):
+async def search_multi_city_flights():
     """
     Multi-city flight search (coming soon).
     For complex itineraries with multiple stops.
     """
     raise HTTPException(
         status_code=501,
-        detail="Multi-city search is not yet implemented"
+        detail="Multi-city search is not yet implemented. Stay tuned!"
     )
-
-
-
-
-
-
-
-
-
-
-# from fastapi import APIRouter, Query, HTTPException, Path, Depends
-# from typing import List, Dict, Any
-# import logging
-# from services import amadeus_service
-# from schemas.flight import Flight
-# # We need this for the new saved searches integration
-# from app.models.models import User
-# from app.api.v1.dependencies import get_current_user
-
-# logging.basicConfig(level=logging.INFO)
-# logger = logging.getLogger(__name__)
-
-# router = APIRouter()
-
-# @router.get("/search", response_model=List[Flight])
-# async def search_flights(
-#     origin: str = Query(..., description="Departure city IATA code", example="TAS"),
-#     destination: str = Query(..., description="Arrival city IATA code", example="IST"),
-#     departure_date: str = Query(..., description="Departure date in YYYY-MM-DD format", example="2025-10-25")
-# ):
-#     try:
-#         flights = await amadeus_service.search_flights_amadeus(
-#             origin=origin, destination=destination, departure_date=departure_date
-#         )
-#         return flights
-#     except Exception as e:
-#         logger.error(f"An unexpected error occurred in search endpoint: {e}", exc_info=True)
-#         raise HTTPException(status_code=500, detail="An internal server error occurred.")
-
-# # --- THE FIX IS HERE ---
-# # The path should NOT include '/flights' again, because the prefix is already
-# # handled in main.py.
-# @router.get("/{flight_id}/details", response_model=Dict[str, Any])
-# async def get_flight_details(
-#     flight_id: str = Path(..., description="The ID of the flight offer"),
-#     origin: str = Query(...),
-#     destination: str = Query(...),
-#     departure_date: str = Query(...)
-# ):
-#     try:
-#         search_params = {"origin": origin, "destination": destination, "departure_date": departure_date}
-#         flight_details = await amadeus_service.get_full_flight_offer(flight_id, search_params)
-        
-#         if not flight_details:
-#             raise HTTPException(status_code=404, detail="Flight details not found or cache expired.")
-#         return flight_details
-#     except Exception as e:
-#         logger.error(f"Error fetching flight details in endpoint: {e}", exc_info=True)
-#         raise HTTPException(status_code=500, detail="Could not retrieve flight details.")
-
-
-
-# @router.get("/search/flexible", response_model=List[Flight])
-# async def search_flights_flexible(
-#     origin: str = Query(..., description="Departure city IATA code", example="TAS"),
-#     destination: str = Query(..., description="Arrival city IATA code", example="IST"),
-#     duration_days: int = Query(..., description="The duration of the trip in days", example=7)
-# ):
-#     try:
-#         flights = await amadeus_service.search_flexible_flights_amadeus(
-#             origin=origin, destination=destination, duration_days=duration_days
-#         )
-#         # We sort by price ascending for the flexible search results
-#         flights.sort(key=lambda f: f.price)
-#         return flights
-#     except amadeus_service.AmadeusTimeoutError as e:
-#         raise HTTPException(status_code=504, detail=str(e))
-#     except Exception as e:
-#         logger.error(f"An unexpected error in flexible search endpoint: {e}", exc_info=True)
-#         raise HTTPException(status_code=500, detail="An internal server error occurred.")
-

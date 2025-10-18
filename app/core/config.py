@@ -12,8 +12,8 @@ class Settings(BaseSettings):
     API_V1_STR: str = "/api/v1"
 
     # OpenAI - Make optional with defaults
-    OPENAI_API_KEY: str = ""  # Empty string as default
-    OPENAI_MODEL: str = "gpt-4o"
+    OPENAI_API_KEY: str  # Empty string as default
+    OPENAI_MODEL: str 
     OPENAI_MAX_TOKENS: int = 1000
     OPENAI_TEMPERATURE: float = 0.3
     
