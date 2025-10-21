@@ -22,6 +22,17 @@ from pydantic import BaseModel, Field, EmailStr, validator
 from prometheus_client import Counter as PrometheusCounter, Histogram, Gauge, generate_latest, CONTENT_TYPE_LATEST
 import logging
 
+
+from app.mappers.flight_transformers import (
+    transform_search_response,
+    transform_offer,
+    get_cheapest_offer,
+    get_fastest_offer,
+    get_direct_flights,
+    filter_by_max_price,
+    filter_by_airline
+)
+
 # ---------------------------
 # Config
 # ---------------------------
@@ -679,12 +690,6 @@ async def observability_mw(request: Request, call_next):
 # API Endpoints
 # ---------------------------
 
-# --- Health & Monitoring Endpoints ---
-
-@router.get("/metrics")
-async def metrics():
-    """Prometheus metrics endpoint."""
-    return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
 @router.get("/healthz")
 async def health():
@@ -699,151 +704,17 @@ async def health():
         }
     }
 
-# --- Cache Admin Endpoints ---
-
-@router.get("/_cache/stats")
-async def cache_stats():
-    """Get detailed cache statistics."""
-    return {
-        "timestamp": time.time(),
-        "caches": {
-            "offer_cache": offer_cache.get_stats(),
-            "result_index_cache": result_index_cache.get_stats()
-        },
-        "circuit_breaker": {
-            "open": breaker.state.open,
-            "failures": breaker.state.failures,
-            "opened_at": breaker.state.opened_at if breaker.state.open else None
-        }
-    }
-
-@router.post("/_cache/clear")
-async def clear_cache(cache_name: Optional[str] = None):
-    """Clear cache(s). WARNING: Forces all requests to hit Duffel API!"""
-    cleared = {}
-    
-    if cache_name == "offers" or cache_name is None:
-        count = offer_cache.clear()
-        offer_cache.stats = {k: 0 for k in offer_cache.stats}
-        cleared["offer_cache"] = count
-    
-    if cache_name == "results" or cache_name is None:
-        count = result_index_cache.clear()
-        result_index_cache.stats = {k: 0 for k in result_index_cache.stats}
-        cleared["result_index_cache"] = count
-    
-    logger.warning("cache_cleared", extra={"extra": cleared})
-    return {"cleared": cleared}
-
-@router.post("/_cache/cleanup")
-async def cleanup_expired():
-    """Manually trigger cleanup of expired cache entries."""
-    offer_cleared = offer_cache.clear_expired()
-    result_cleared = result_index_cache.clear_expired()
-    
-    return {
-        "expired_removed": {
-            "offer_cache": offer_cleared,
-            "result_index_cache": result_cleared
-        },
-        "current_sizes": {
-            "offer_cache": len(offer_cache.store),
-            "result_index_cache": len(result_index_cache.store)
-        }
-    }
-
-@router.get("/_cache/keys")
-async def cache_keys(cache_name: str = "offers", limit: int = 50):
-    """List cache keys for debugging."""
-    if cache_name == "offers":
-        keys = offer_cache.keys()
-        total = len(keys)
-        keys_paginated = keys[:limit]
-    elif cache_name == "results":
-        keys = result_index_cache.keys()
-        total = len(keys)
-        keys_paginated = keys[:limit]
-    else:
-        raise HTTPException(400, "cache_name must be 'offers' or 'results'")
-    
-    return {
-        "cache": cache_name,
-        "showing": len(keys_paginated),
-        "total_keys": total,
-        "keys": keys_paginated
-    }
-
-# --- BUG FIX ---
-# This endpoint was broken as it can't filter on hashed keys.
-# It is now simplified to be a "clear all" endpoint, which is safe.
-# The misleading filter parameters (origin, dest, date) have been removed.
-# --- END FIX ---
-@router.post("/_cache/invalidate")
-async def invalidate_cache():
-    """
-    Manually invalidate the entire search cache.
-    
-    Use cases:
-    - Major price drops detected
-    - Major schedule changes
-    - Forces all new searches to go to Duffel
-    
-    WARNING: This clears both the result_index_cache and offer_cache.
-    """
-    result_count = result_index_cache.clear()
-    offer_count = offer_cache.clear()
-    
-    logger.warning("cache_invalidated_all", extra={"extra": {
-        "result_entries": result_count,
-        "offer_entries": offer_count
-    }})
-    
-    return {
-        "invalidated": "all",
-        "result_entries_cleared": result_count,
-        "offer_entries_cleared": offer_count
-    }
-
-# --- BUG FIX ---
-# Updated response to be accurate. The cache stores a single
-# object, not a list of entries.
-# --- END FIX ---
-@router.get("/_index/lookup")
-async def index_lookup(
-    origin: str,
-    destination: str,
-    date: str,
-    pax: int = 1,
-    cabin: Optional[str] = None,
-    max_connections: int = 1
-):
-    """
-    Debug endpoint to lookup a cached search by parameters.
-    Returns the cached offer_request_id for the given search criteria.
-    """
-    # Build synthetic SearchRequest to derive cache key
-    dummy = SearchRequest(
-        slices=[SliceIn(origin=origin, destination=destination, departure_date=date)],
-        passengers=[PaxIn(type="adult") for _ in range(pax)],
-        cabin_class=cabin,
-        max_connections=max_connections,
-        return_offers=True # Flag doesn't matter for key gen
-    )
-    key = normalize_search_key(dummy)
-    val = result_index_cache.get(key)
-    
-    return {
-        "cache_key": key,
-        "entry": val, # Fixed: was "entries": val or []
-        "cached": val is not None
-    }
 
 # --- Core Flight Search Endpoint ---
-
 @router.post("/search", response_model=SearchResponse)
-async def search(req: SearchRequest):
+async def search(req: SearchRequest, format: str = "clean"):
     """
-    Smart flight search with multi-layer caching.
+    Smart flight search with multi-layer caching and clean response formatting.
+    
+    Query Parameters:
+        format: Response format - 'clean' (default) or 'raw'
+                'clean' returns frontend-friendly JSON
+                'raw' returns original Duffel response
     """
     
     # Generate deterministic cache key
@@ -874,20 +745,39 @@ async def search(req: SearchRequest):
                         "offers_count": len(cached_offers)
                     }})
                     
-                    # Return cached result with proper pagination
+                    # Prepare response based on format
                     page = cached_offers[:req.page_size]
-                    return SearchResponse(
-                        offer_request_id=orq_id,
-                        offers=page,
-                        meta=PageMeta(
-                            page_size=req.page_size,
-                            has_more=len(cached_offers) > len(page),
-                            next_after=None,
-                            source="cached",
-                            cache_hit=True,
-                            cache_age_seconds=round(age_seconds, 1)
-                        )
+                    
+                    meta_data = PageMeta(
+                        page_size=req.page_size,
+                        has_more=len(cached_offers) > len(page),
+                        next_after=None,
+                        source="cached",
+                        cache_hit=True,
+                        cache_age_seconds=round(age_seconds, 1)
                     )
+                    
+                    # Return in requested format
+                    if format == "clean":
+                        # Transform to clean format
+                        response_data = {
+                            "offer_request_id": orq_id,
+                            "offers": page,
+                            "meta": meta_data.dict()
+                        }
+                        clean_response = transform_search_response(response_data, limit=req.page_size)
+                        return SearchResponse(
+                            offer_request_id=orq_id,
+                            offers=clean_response["offers"],
+                            meta=meta_data
+                        )
+                    else:
+                        # Return raw format
+                        return SearchResponse(
+                            offer_request_id=orq_id,
+                            offers=page,
+                            meta=meta_data
+                        )
             else:
                 logger.info("cache_miss", extra={"extra": {
                     "cache_key": cache_key[:12],
@@ -956,154 +846,81 @@ async def search(req: SearchRequest):
         # Cache offers for subsequent requests
         if offers:
             offer_cache.set(orq_id, offers)
-            
-        return SearchResponse(
-            offer_request_id=orq_id,
-            offers=offers,
-            meta=PageMeta(
-                page_size=req.page_size,
-                has_more=bool(next_after),
-                next_after=next_after,
-                source="fresh_paged",
-                cache_hit=False
-            )
+        
+        meta_data = PageMeta(
+            page_size=req.page_size,
+            has_more=bool(next_after),
+            next_after=next_after,
+            source="fresh_paged",
+            cache_hit=False
         )
+        
+        # Return in requested format
+        if format == "clean":
+            response_data = {
+                "offer_request_id": orq_id,
+                "offers": offers,
+                "meta": meta_data.dict()
+            }
+            clean_response = transform_search_response(response_data, limit=req.page_size)
+            return SearchResponse(
+                offer_request_id=orq_id,
+                offers=clean_response["offers"],
+                meta=meta_data
+            )
+        else:
+            return SearchResponse(
+                offer_request_id=orq_id,
+                offers=offers,
+                meta=meta_data
+            )
 
     # return_offers = true -> embedded offers in response
     embedded = orq.get("offers") or []
     if embedded:
         # Cache ALL embedded offers
         offer_cache.set(orq_id, embedded)
-        
+    
     page = embedded[:req.page_size]
     has_more = len(embedded) > len(page)
     
-    return SearchResponse(
-        offer_request_id=orq_id,
-        offers=page,
-        meta=PageMeta(
-            page_size=req.page_size,
-            has_more=has_more,
-            next_after=None,
-            source="fresh_embedded",
-            cache_hit=False
-        )
+    meta_data = PageMeta(
+        page_size=req.page_size,
+        has_more=has_more,
+        next_after=None,
+        source="fresh_embedded",
+        cache_hit=False
     )
-
-# --- Other Flight Endpoints ---
-
-@router.get("/offer_requests/{orq_id}")
-async def get_offer_request_endpoint(orq_id: str): # Renamed to avoid conflict
-    """Get offer request details."""
-    resp = await duffel.get_offer_request(orq_id)
-    if "offers" in resp.get("data", {}):
-        offer_cache.set(orq_id, resp["data"]["offers"])
-    return resp
-
-@router.get("/offer_requests/{orq_id}/offers")
-async def get_offers_for_request(orq_id: str, limit: int = 50, after: Optional[str] = None):
-    """Get offers for a specific offer request with pagination."""
-    # Try cache first
-    offers = offer_cache.get(orq_id)
-    if offers is not None and not after: # Only return from cache if it's the first page
-        page = offers[:limit]
-        return {
-            "data": page, 
-            "meta": {
-                "cached": True, 
-                "limit": limit,
-                "after": None, # You can't paginate from this cache
-                "before": None
-            }
+    
+    # Return in requested format
+    if format == "clean":
+        response_data = {
+            "offer_request_id": orq_id,
+            "offers": page,
+            "meta": meta_data.dict()
         }
+        clean_response = transform_search_response(response_data, limit=req.page_size)
+        return SearchResponse(
+            offer_request_id=orq_id,
+            offers=clean_response["offers"],
+            meta=meta_data
+        )
+    else:
+        return SearchResponse(
+            offer_request_id=orq_id,
+            offers=page,
+            meta=meta_data
+        )
 
-    # Otherwise paginate from Duffel
-    data = await duffel.list_offers(offer_request_id=orq_id, limit=limit, after=after)
-    
-    # Warm cache with first page
-    if not after and data.get("data"):
-        offer_cache.set(orq_id, data["data"])
-    
-    return data
 
-@router.get("/offers/{offer_id}")
-async def get_offer_endpoint(offer_id: str): # Renamed to avoid conflict
-    """Get specific offer details."""
-    return await duffel.get_offer(offer_id)
-
-@router.post("/offers/{orq_id}/aggregate")
-async def aggregate_offers(orq_id: str, q: OfferQuery):
+@router.get("/offers/{offer_id}/clean")
+async def get_offer_clean(offer_id: str):
     """
-    Server-side aggregation with filtering and sorting.
-    Pages through Duffel offers until collecting enough, then filters/sorts.
+    Get a single offer in clean, frontend-friendly format.
     """
-    collected: List[Dict[str, Any]] = []
-    after = None
-    page_limit = min(200, max(50, q.limit))
-    rounds = 0
+    raw_offer = await duffel.get_offer(offer_id)
+    offer_data = raw_offer.get("data", {})
     
-    while len(collected) < q.limit and rounds < 10: # Max 10 pages
-        page = await duffel.list_offers(offer_request_id=orq_id, limit=page_limit, after=after)
-        page_data = page.get("data", [])
-        if not page_data:
-            break
-        
-        collected.extend(page_data)
-        after = (page.get("meta", {}) or {}).get("after")
-        rounds += 1
-        if not after:
-            break
-
-    filtered = filter_sort_offers(collected, q)
-    return {"data": filtered[:q.limit], "meta": {"scanned": len(collected), "pages": rounds}}
-
-# --- Booking Endpoints ---
-
-@router.post("/orders", response_model=OrderResponse)
-async def create_order_endpoint(req: CreateOrderRequest): # Renamed
-    """Create a flight booking order."""
-    # Refresh offer just before booking
-    offer = await duffel.get_offer(req.selected_offer_id)
-    total_currency = offer["data"]["total_currency"]
-    total_amount = offer["data"]["total_amount"]
-
-    if req.type == "instant":
-        if req.payment.currency != total_currency or req.payment.amount != total_amount:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Payment must match offer total ({total_amount} {total_currency})."
-            )
-
-    order_payload = {
-        "selected_offers": [req.selected_offer_id],
-        "passengers": [p.dict() for p in req.passengers],
-        "type": req.type,
+    return {
+        "offer": transform_offer(offer_data)
     }
-    if req.type == "instant":
-        order_payload["payments"] = [req.payment.dict()]
-
-    order_resp = await duffel.create_order(order_payload)
-    data = order_resp["data"]
-
-    logger.info("order_created", extra={"extra": {
-        "order_id": data["id"],
-        "booking_reference": data.get("booking_reference"),
-        "selected_offer_id": req.selected_offer_id
-    }})
-
-    return OrderResponse(
-        order_id=data["id"],
-        booking_reference=data.get("booking_reference"),
-        raw=data
-    )
-
-@router.get("/orders/{order_id}", response_model=OrderResponse)
-async def get_order_endpoint(order_id: str): # Renamed
-    """Get order details."""
-    data = await duffel.get_order(order_id)
-    d = data["data"]
-    return OrderResponse(
-        order_id=d["id"],
-        booking_reference=d.get("booking_reference"),
-        raw=d
-    )

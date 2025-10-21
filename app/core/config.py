@@ -1,4 +1,106 @@
-# app/core/config.py - FIXED with Optional Fields for Railway
+# # app/core/config.py
+# import os
+# from typing import List, Optional
+# from pydantic_settings import BaseSettings
+# import secrets
+# from dotenv import load_dotenv
+
+# load_dotenv()
+
+# class Settings(BaseSettings):
+#     PROJECT_NAME: str = "SkySearch AI - Flight Metasearch"
+#     API_V1_STR: str = "/api/v1"
+
+#     # OpenAI Configuration - with explicit defaults
+#     OPENAI_API_KEY: str
+#     OPENAI_MODEL: str = "gpt-4o"  # Default model
+#     OPENAI_MAX_TOKENS: int = 1000
+#     OPENAI_TEMPERATURE: float = 0.3
+    
+#     # AI Feature Flags
+#     ENABLE_AI_SEARCH: bool = True
+#     AI_FALLBACK_TO_TRADITIONAL: bool = True
+#     AI_RATE_LIMIT_PER_MINUTE: int = 20
+
+#     # Amadeus Credentials (if using)
+#     AMADEUS_API_KEY: str = ""  # Made optional
+#     AMADEUS_API_SECRET: str = ""  # Made optional
+#     AMADEUS_TOKEN_URL: str = "https://test.api.amadeus.com/v1/security/oauth2/token"
+#     AMADEUS_SEARCH_URL: str = "https://test.api.amadeus.com/v2/shopping/flight-offers"
+    
+#     # Duffel API (Optional - for future use)
+#     DUFFEL_API_KEY: str = ""  # Made optional with default
+#     DUFFEL_API_URL: str = "https://api.duffel.com"  # Made optional with default
+    
+#     # Redis (with defaults for Railway)
+#     REDIS_URI: str = "redis://localhost:6379"
+
+#     # Celery (with defaults for Railway)
+#     CELERY_BROKER_URL: str = "redis://localhost:6379/1"
+#     CELERY_RESULT_BACKEND: str = "redis://localhost:6379/1"
+
+#     # TravelPayouts API (with empty defaults)
+#     TRAVELPAYOUTS_API_TOKEN: str = ""
+#     TRAVELPAYOUTS_MARKER: str = ""
+
+#     # Database Configuration (with defaults for Railway)
+#     DB_USER: str = "root"  # Override with Railway env var
+#     DB_PASSWORD: str = "password"  # Override with Railway env var
+#     DB_HOST: str # Override with Railway env var
+#     DB_PORT: int = 3306
+#     DB_NAME: str = "skysearch"
+    
+#     @property
+#     def DATABASE_URL(self) -> str:
+#         return f"mysql+aiomysql://{self.DB_USER}:{self.DB_PASSWORD}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
+
+#     # JWT Security
+#     SECRET_KEY: str = secrets.token_urlsafe(32)
+#     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 days
+#     ALGORITHM: str = "HS256"  # Added default
+
+#     # Google OAuth (Optional)
+#     GOOGLE_CLIENT_ID: str = ""
+#     GOOGLE_CLIENT_SECRET: str = ""
+#     GOOGLE_REDIRECT_URI: str = "http://127.0.0.1:8000/api/v1/auth/google/callback"
+
+#     # Payment Integrations (Optional for MVP)
+#     STRIPE_SECRET_KEY: str = ""
+#     STRIPE_PUBLISHABLE_KEY: str = ""
+#     STRIPE_WEBHOOK_SECRET: str = ""
+    
+#     CLICK_MERCHANT_ID: str = ""
+#     CLICK_SERVICE_ID: str = ""
+#     CLICK_SECRET_KEY: str = ""
+    
+#     PAYME_MERCHANT_ID: str = ""
+#     PAYME_SECRET_KEY: str = ""
+    
+#     # Email & SMS (Optional for MVP)
+#     SENDGRID_API_KEY: str = ""
+#     FROM_EMAIL: str = "noreply@skysearch.ai"
+    
+#     ESKIZ_EMAIL: str = ""
+#     ESKIZ_PASSWORD: str = ""
+
+#     # CORS Origins
+#     BACKEND_CORS_ORIGINS: List[str] = ["*"]
+    
+#     # Frontend URL
+#     FRONTEND_URL: str = "http://localhost:3000"
+    
+#     # Cache TTL Settings
+#     CACHE_TTL_SEARCH: int = 900  # 15 minutes - Added default
+#     CACHE_TTL_OFFERS: int = 300  # 5 minutes - Added default
+
+#     class Config:
+#         case_sensitive = True
+#         env_file = ".env"
+#         env_file_encoding = "utf-8"
+
+# settings = Settings()
+
+
 import os
 from typing import List, Optional
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -13,7 +115,7 @@ class Settings(BaseSettings):
 
     # OpenAI - Make optional with defaults
     OPENAI_API_KEY: str  # Empty string as default
-    OPENAI_MODEL: str 
+    OPENAI_MODEL: str = "gpt-4o" 
     OPENAI_MAX_TOKENS: int = 1000
     OPENAI_TEMPERATURE: float = 0.3
     
@@ -30,7 +132,7 @@ class Settings(BaseSettings):
     
     # Duffel API
     DUFFEL_API_KEY: str
-    DUFFEL_API_URL: str 
+    DUFFEL_API_URL: str = "https://api.duffel.com"
     
     # Redis - Make optional with default
     REDIS_URI: str = "redis://localhost:6379/0"
