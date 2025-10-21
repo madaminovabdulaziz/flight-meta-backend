@@ -29,8 +29,8 @@ class Settings(BaseSettings):
     AMADEUS_SEARCH_URL: str = "https://test.api.amadeus.com/v2/shopping/flight-offers"
     
     # Duffel API
-    DUFFEL_API_KEY: str = ""
-    DUFFEL_API_URL: str = "https://api.duffel.com"
+    DUFFEL_API_KEY: str
+    DUFFEL_API_URL: str 
     
     # Redis - Make optional with default
     REDIS_URI: str = "redis://localhost:6379/0"

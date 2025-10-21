@@ -468,13 +468,13 @@ async def search_flexible_flights_amadeus(
     elif user_intent == "find_fastest":
         all_results.sort(key=lambda x: _parse_duration_to_minutes(x.outbound.duration))
 
-    await _zset(cache_key, [f.model_dump() for f in all_results], ttl=TTL_SEARCH)
-    logger.info(f"Flexible search found {len(all_results)} total options from {len(tasks)} queries")
-    return all_results
+    # Deduplicate flights (optional step but good practice for flexible search)
+    unique_flights = {f.id: f for f in all_results}.values()
 
-# Other functions (parse_flight_offers, get_full_flight_offer, price_flight_offer, create_flight_order)
-# remain unchanged unless you need specific tweaks for your use case.
-# I'll include them for completeness but without modification.
+    await _zset(cache_key, [f.model_dump() for f in unique_flights], ttl=TTL_SEARCH)
+    logger.info(f"Flexible search found {len(unique_flights)} total unique options from {len(tasks)} queries")
+    return list(unique_flights)
+
 
 def _parse_itinerary(itinerary: Dict[str, Any], carriers: Dict[str, str]) -> FlightLeg:
     segments_data = itinerary.get("segments", [])
@@ -545,11 +545,13 @@ async def get_full_flight_offer(
     flight_id: str, 
     search_params: dict
 ) -> Optional[Dict[str, Any]]:
+    # Create the cache key based on search parameters to locate the raw Amadeus response
     cache_key = _make_cache_key(
         origin=search_params['origin'],
         destination=search_params['destination'],
         departure_date=search_params['departure_date'],
-        return_date=search_params.get('return_date'),
+        # IMPORTANT: When retrieving from cache, all optional params must match the key generation
+        return_date=search_params.get('return_date'), 
         adults=search_params.get('adults', 1),
         children=search_params.get('children', 0),
         infants=search_params.get('infants', 0),
@@ -559,18 +561,24 @@ async def get_full_flight_offer(
         user_intent=search_params.get('user_intent', 'find_best_value'),
         max_price=search_params.get('max_price')
     )
-    raw_key = f"raw:{cache_key}"
+    # The full Amadeus response is stored under the 'raw:' prefix
+    raw_key = f"raw:{cache_key}" 
     full = await _zget(raw_key)
     if not full:
         logger.info("Raw cache miss for %s", raw_key)
         return None
     for offer in full.get("data", []):
         if offer.get("id") == flight_id:
+            # Return the specific offer and the dictionaries for re-pricing
             return {"offer": offer, "dictionaries": full.get("dictionaries", {})}
     logger.info("Offer %s not found under %s", flight_id, raw_key)
     return None
 
 async def price_flight_offer(flight_offer: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Calls Amadeus Flight Offers Price API to re-validate and confirm the final fare.
+    Uses v2 of the API.
+    """
     if await _cb_is_open():
         raise HTTPException(status_code=503, detail="Flight provider unavailable. Try again shortly.")
     logger.info("Pricing flight offer...")
@@ -579,7 +587,8 @@ async def price_flight_offer(flight_offer: Dict[str, Any]) -> Dict[str, Any]:
     payload = {"data": {"type": "flight-offers-pricing", "flightOffers": [flight_offer]}}
     client = await _get_httpx_client()
     try:
-        resp = await client.post("https://test.api.amadeus.com/v2/shopping/flight-offers/", headers=headers, json=payload)
+        # Use v2 endpoint for pricing
+        resp = await client.post("https://test.api.amadeus.com/v1/shopping/flight-offers/pricing", headers=headers, json=payload)
         resp.raise_for_status()
         await _cb_record_success()
         return resp.json()
@@ -593,6 +602,10 @@ async def price_flight_offer(flight_offer: Dict[str, Any]) -> Dict[str, Any]:
         raise AmadeusTimeoutError("Pricing request timed out") from e
 
 async def create_flight_order(priced_offer_data: Dict[str, Any], passengers: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """
+    Calls Amadeus Flight Create Orders API to create the PNR/Booking.
+    Uses v2 of the API.
+    """
     if await _cb_is_open():
         raise HTTPException(status_code=503, detail="Flight provider unavailable. Try again shortly.")
     logger.info("Creating flight order (PNR)...")
@@ -606,28 +619,33 @@ async def create_flight_order(priced_offer_data: Dict[str, Any], passengers: Lis
             "name": {"firstName": p["first_name"], "lastName": p["last_name"]},
             "contact": {
                 "emailAddress": p["email"],
-                "phones": [{"deviceType": "MOBILE", "countryCallingCode": "998", "number": p["phone_number"].replace("+", "")}],
+                # Assuming Uzbekistan country code for phones (+998). Note: Amadeus accepts + or just the number.
+                "phones": [{"deviceType": "MOBILE", "countryCallingCode": "998", "number": p["phone_number"].lstrip("+").lstrip("998")}],
             },
         })
     payload = {
         "data": {
             "type": "flight-order",
-            "flightOffers": priced_offer_data["data"]["flightOffers"],
+            "flightOffers": priced_offer_data["data"]["flightOffers"], # Use the flightOffers list from the priced response
             "travelers": travelers,
-            "remarks": {"general": [{"subType": "GENERAL_MISCELLANEOUS", "text": "FlyUz MVP Booking"}]},
+            # Placeholder remarks for the consolidator (who will issue the ticket)
+            "remarks": {"general": [{"subType": "GENERAL_MISCELLANEOUS", "text": "SkySearchAI MVP Booking"}]},
+            # Ticketing agreement: DELAY_TO_CANCEL is used for test/consolidator flow
             "ticketingAgreement": {"option": "DELAY_TO_CANCEL", "delay": "6H"},
+            # Placeholder contact info for the travel agency (SkySearch AI)
             "contacts": [{
-                "addresseeName": {"firstName": "FlyUz", "lastName": "Booking"},
-                "companyName": "FlyUz",
+                "addresseeName": {"firstName": "SkySearch", "lastName": "AI"},
+                "companyName": "SkySearch AI",
                 "purpose": "STANDARD",
                 "phones": [{"deviceType": "MOBILE", "countryCallingCode": "998", "number": "901234567"}],
-                "emailAddress": "bookings@flyuz.dev",
+                "emailAddress": "bookings@skysearchai.dev",
             }],
         }
     }
     client = await _get_httpx_client()
     try:
-        resp = await client.post("https://test.api.amadeus.com/v2/booking/flight-orders", headers=headers, json=payload)
+        # Use v2 endpoint for booking
+        resp = await client.post("https://test.api.amadeus.com/v1/booking/flight-orders", headers=headers, json=payload)
         if resp.status_code != 201:
             await _cb_record_failure()
             logger.error("Booking failed: %s %s", resp.status_code, resp.text[:800])

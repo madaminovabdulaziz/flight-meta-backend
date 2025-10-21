@@ -11,6 +11,8 @@ from enum import Enum
 import logging
 from services import amadeus_service
 from schemas.flight_segment import Flight
+# NEW IMPORT: Import the new booking schemas
+from schemas.booking import PriceFlightRequest, CreateOrderRequest 
 from app.models.models import User
 from app.api.v1.dependencies import get_current_user
 from services.ai_service import get_ai_service, AIFlightSearchService
@@ -375,7 +377,115 @@ async def search_flights(
         )
 
 
-# ==================== FLIGHT DETAILS ====================
+# ==================== FLIGHT DETAILS / RE-PRICING ====================
+
+@router.post("/price", response_model=Dict[str, Any])
+async def price_selected_flight(
+    request: PriceFlightRequest = Body(...)
+):
+    """
+    Step 2: Re-validates and re-prices a flight offer to ensure availability and current fare.
+    The response contains the final, guaranteed price before booking.
+    """
+    logger.info(f"Pricing flight ID: {request.flight_id}")
+    
+    # 1. Retrieve the full Amadeus offer object from the cache
+    search_params = request.model_dump(exclude_none=True)
+    full_offer_data = await amadeus_service.get_full_flight_offer(
+        request.flight_id, 
+        search_params
+    )
+    
+    if not full_offer_data:
+        raise HTTPException(
+            status_code=404,
+            detail="Flight offer not found in cache. Please perform a new search."
+        )
+    
+    # 2. Call the Amadeus Pricing API
+    try:
+        priced_offer = await amadeus_service.price_flight_offer(full_offer_data["offer"])
+        logger.info(f"Flight ID {request.flight_id} successfully priced.")
+        return priced_offer
+        
+    except amadeus_service.AmadeusTimeoutError:
+        raise HTTPException(
+            status_code=504,
+            detail="Pricing request timed out. The Amadeus service may be busy."
+        )
+    except HTTPException as e:
+        if e.status_code == 400:
+            raise HTTPException(
+                status_code=400,
+                detail="Flight price is no longer valid or offer is expired."
+            )
+        raise
+    except Exception as e:
+        logger.error(f"Error during pricing: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail="An unexpected error occurred while re-pricing the flight."
+        )
+
+
+# ==================== FLIGHT ORDER / BOOKING ====================
+
+@router.post("/order", response_model=Dict[str, Any], status_code=201)
+async def create_flight_order(
+    request: CreateOrderRequest = Body(...)
+):
+    """
+    Step 3: Creates the final flight order (PNR) using the priced offer data.
+    Note: In the Amadeus Self-Service environment, this creates the booking but requires
+    a separate consolidator agreement for final ticket issuance.
+    """
+    if not request.passengers:
+        raise HTTPException(status_code=400, detail="Passenger details are required for booking.")
+    
+    logger.info(f"Attempting to create flight order for {len(request.passengers)} passengers.")
+    
+    try:
+        # The service function expects a list of dictionaries for passengers
+        passenger_list = [p.model_dump() for p in request.passengers]
+        
+        order_response = await amadeus_service.create_flight_order(
+            request.priced_offer_data,
+            passenger_list
+        )
+        
+        # Log PNR confirmation
+        pnr = order_response.get("data", {}).get("id")
+        logger.info(f"Successfully created PNR/Order ID: {pnr}")
+        
+        return {
+            "status": "success",
+            "message": "Flight order created successfully. PNR ready for ticketing.",
+            "order_id": pnr,
+            "amadeus_response": order_response
+        }
+        
+    except amadeus_service.AmadeusTimeoutError:
+        raise HTTPException(
+            status_code=504,
+            detail="Booking request timed out. The Amadeus service may be busy."
+        )
+    except HTTPException as e:
+        # Handle 400s which could mean invalid data or expired fare
+        if e.status_code in (400, 404):
+            raise HTTPException(
+                status_code=400,
+                detail=f"Booking failed due to invalid data or expired fare: {e.detail}"
+            )
+        raise
+    except Exception as e:
+        logger.error(f"Error during order creation: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail="An unexpected error occurred while creating the flight order."
+        )
+
+
+# ==================== FLIGHT DETAILS / CACHE RETRIEVAL ====================
 
 @router.get("/{flight_id}/details", response_model=Dict[str, Any])
 async def get_flight_details(
@@ -386,7 +496,7 @@ async def get_flight_details(
 ):
     """
     Get detailed information about a specific flight offer.
-    Requires the original search parameters to retrieve from cache.
+    Requires the original search parameters to retrieve the full Amadeus offer from cache.
     """
     try:
         search_params = {
