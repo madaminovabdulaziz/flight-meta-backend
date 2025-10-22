@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import asyncio
 from app.core.config import settings
 from app.db.database import engine, Base
-from app.api.v1.endpoints import flights, auth, hot_routes, nearest_airport, email_collection, duffel_new
+from app.api.v1.endpoints import flights, auth, hot_routes, nearest_airport, email_collection, duffel_new, airports
 
 async def create_db_and_tables():
     async with engine.begin() as conn:
@@ -69,6 +69,7 @@ app.add_middleware(
 # Include your API routers here
 app.include_router(auth.router, prefix=f"{settings.API_V1_STR}/auth", tags=["auth"])
 app.include_router(nearest_airport.router, prefix=f"{settings.API_V1_STR}/nearest-airport", tags=["nearest airport"])
+app.include_router(airports.router, prefix=f"{settings.API_V1_STR}/airports", tags=["airports"])
 app.include_router(duffel_new.router, prefix=f"{settings.API_V1_STR}/duffel-search", tags=["Duffel Flights"])
 app.include_router(flights.router, prefix=f"{settings.API_V1_STR}/flights", tags=["flights"])
 #app.include_router(clicks.router, prefix=f"{settings.API_V1_STR}/clicks", tags=["clicks"])

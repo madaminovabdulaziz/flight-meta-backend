@@ -27,37 +27,36 @@ class AirportSearchResponse(BaseModel):
         }
 
 
+# app/schemas/airport.py
+
+
 class AirportResponse(BaseModel):
-    """
-    Complete airport information including coordinates and timezone.
-    Used for detailed airport pages.
-    """
-    id: int
-    iata_code: str = Field(..., description="3-letter IATA code")
-    icao_code: Optional[str] = Field(None, description="4-letter ICAO code")
-    name: str
-    city: str
-    country: str
-    country_code: str
-    timezone: str = Field(..., description="Timezone (e.g., 'Europe/Istanbul')")
-    latitude: Optional[float] = Field(None, description="Latitude coordinate")
-    longitude: Optional[float] = Field(None, description="Longitude coordinate")
-    is_active: bool = Field(True, description="Whether airport is operational")
+    iata_code: str = Field(..., example="JFK")
+    icao_code: Optional[str] = Field(None, example="KJFK")
+    name: str = Field(..., example="John F. Kennedy International Airport")
+    city: str = Field(..., example="New York")
+    country: str = Field(..., example="United States")
+    country_code: str = Field(..., example="US")
+    timezone: str = Field(..., example="America/New_York")
+    latitude: Optional[float] = Field(None, example=40.6413)
+    longitude: Optional[float] = Field(None, example=-73.7781)
+    
+    @property
+    def display_name(self) -> str:
+        """Format for dropdown: 'JFK - New York, United States'"""
+        return f"{self.iata_code} - {self.city}, {self.country}"
     
     class Config:
-        from_attributes = True
         json_schema_extra = {
             "example": {
-                "id": 1,
-                "iata_code": "IST",
-                "icao_code": "LTFM",
-                "name": "Istanbul Airport",
-                "city": "Istanbul",
-                "country": "Turkey",
-                "country_code": "TR",
-                "timezone": "Europe/Istanbul",
-                "latitude": 41.2619,
-                "longitude": 28.7414,
-                "is_active": True
+                "iata_code": "JFK",
+                "icao_code": "KJFK",
+                "name": "John F. Kennedy International Airport",
+                "city": "New York",
+                "country": "United States",
+                "country_code": "US",
+                "timezone": "America/New_York",
+                "latitude": 40.6413,
+                "longitude": -73.7781
             }
         }
