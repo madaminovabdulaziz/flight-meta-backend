@@ -90,6 +90,26 @@ TOURIST_AIRPORTS = {
 }
 
 # ============================================================================
+# CLOSED/INACTIVE AIRPORTS BLACKLIST
+# ============================================================================
+
+# Permanently closed airports that should NOT appear in search results
+CLOSED_AIRPORTS = {
+    'ISL',  # Istanbul Atatürk (closed April 2019, replaced by IST) ⭐
+    'THF',  # Berlin Tempelhof (closed 2008)
+    'TXL',  # Berlin Tegel (closed November 2020, replaced by BER)
+    'SXF',  # Berlin Schönefeld (closed October 2020, merged into BER)
+    'HKG_KAI',  # Hong Kong Kai Tak (closed 1998)
+    'MHG',  # Mannheim City Airport (closed 1995)
+    'OSL_FBU',  # Oslo Fornebu (closed 1998, replaced by OSL Gardermoen)
+    'MUC_RIE',  # Munich-Riem (closed 1992, replaced by MUC)
+    'DEN_STA',  # Denver Stapleton (closed 1995, replaced by DEN)
+    'ATH_HEL',  # Athens Hellenikon (closed 2001, replaced by ATH)
+}
+
+# Note: OpenFlights may still have these. We filter them out during search.
+
+# ============================================================================
 # TRANSLITERATION MAPS
 # ============================================================================
 
@@ -323,6 +343,11 @@ class AirportService:
                 country = row[3].strip()
                 
                 if not iata_code or iata_code == '\\N' or len(iata_code) != 3:
+                    continue
+                
+                # Filter out closed airports
+                if iata_code.upper() in CLOSED_AIRPORTS:
+                    logger.debug(f"Skipping closed airport: {iata_code} - {name}")
                     continue
                 
                 try:
