@@ -18,6 +18,78 @@ CACHE_KEY = "airports:all"
 CACHE_TTL = int(timedelta(hours=24).total_seconds())
 
 # ============================================================================
+# AIRPORT POPULARITY RANKINGS
+# ============================================================================
+
+# Major international hubs (popularity score: 100)
+MAJOR_HUBS = {
+    'LHR', 'JFK', 'LAX', 'ORD', 'DXB', 'CDG', 'AMS', 'FRA', 'IST', 'SIN',
+    'HKG', 'ICN', 'NRT', 'SYD', 'YYZ', 'DEL', 'BKK', 'KUL', 'DFW', 'SFO',
+    'ATL', 'PEK', 'PVG', 'CAN', 'MAD', 'BCN', 'FCO', 'MUC', 'ZRH', 'VIE',
+    'LGW', 'MAN', 'BER', 'ARN', 'CPH', 'OSL', 'HEL', 'WAW', 'PRG', 'BUD',
+    'ATH', 'LIS', 'DUB', 'EDI', 'GLA', 'BRU', 'AMS', 'GVA', 'NCE', 'MXP',
+    'MEX', 'GRU', 'EZE', 'SCL', 'BOG', 'LIM', 'GIG', 'PTY', 'UIO', 'MVD'
+}
+
+# Regional hubs and large airports (popularity score: 80)
+REGIONAL_HUBS = {
+    'SVO', 'DME', 'LED', 'TAS', 'ALA', 'NQZ', 'FRU', 'SKD', 'BHK', 'DYU',
+    'TBS', 'EVN', 'GYD', 'BAK', 'MCX', 'OVB', 'KZN', 'VVO', 'ROV', 'UFA',
+    'KRR', 'AER', 'VKO', 'SVX', 'KJA', 'IKT', 'OMS', 'TJM', 'UUS', 'PKC',
+    'MIA', 'IAH', 'SEA', 'LAS', 'PHX', 'DEN', 'BOS', 'MCO', 'EWR', 'CLT',
+    'MSP', 'DTW', 'PHL', 'LGA', 'BWI', 'IAD', 'DCA', 'SAN', 'PDX', 'AUS',
+    'YVR', 'YUL', 'YYC', 'YEG', 'YOW', 'YHZ', 'YWG', 'YYJ', 'YXE', 'YQR',
+    'MEL', 'BNE', 'PER', 'ADL', 'AKL', 'CHC', 'WLG', 'CBR', 'OOL', 'CNS',
+    'BOM', 'BLR', 'HYD', 'CCU', 'MAA', 'AMD', 'COK', 'GOI', 'PNQ', 'JAI',
+    'CMB', 'DAC', 'KTM', 'RGN', 'HAN', 'SGN', 'MNL', 'CGK', 'SUB', 'DPS',
+    'KUL', 'PEN', 'JHB', 'BKI', 'KCH', 'MFM', 'CTS', 'FUK', 'KIX', 'NGO',
+    'HND', 'OKA', 'TPE', 'KHH', 'ICN', 'GMP', 'CJU', 'PUS', 'TAO', 'XIY',
+    'CTU', 'CKG', 'WUH', 'SZX', 'XMN', 'CSX', 'KWL', 'NKG', 'HGH', 'SIA',
+    'JNB', 'CPT', 'DUR', 'CAI', 'HRG', 'SSH', 'TLV', 'AMM', 'DOH', 'AUH',
+    'MCT', 'KWI', 'BAH', 'RUH', 'JED', 'DMM', 'ADD', 'NBO', 'DAR', 'EBB',
+    'ACC', 'LOS', 'ABV', 'DKR', 'ABJ', 'CMN', 'RAK', 'TUN', 'ALG', 'TIP'
+}
+
+# Capital city airports (popularity score: 60)
+CAPITAL_AIRPORTS = {
+    'MOW', 'ROM', 'PAR', 'BER', 'MAD', 'LIS', 'DUB', 'BRU', 'AMS', 'VIE',
+    'BUD', 'WAW', 'PRG', 'BEG', 'ZAG', 'LJU', 'SKP', 'TIA', 'SOF', 'OTP',
+    'KIV', 'RIX', 'TLL', 'VNO', 'HEL', 'CPH', 'OSL', 'STO', 'REK', 'ATH'
+}
+
+# City codes that represent multiple airports (score boost)
+MULTI_AIRPORT_CITIES = {
+    'LON': ['LHR', 'LGW', 'STN', 'LTN', 'LCY', 'SEN'],  # London
+    'NYC': ['JFK', 'LGA', 'EWR'],  # New York
+    'PAR': ['CDG', 'ORY', 'BVA'],  # Paris
+    'BER': ['BER', 'TXL', 'SXF'],  # Berlin
+    'MOW': ['SVO', 'DME', 'VKO'],  # Moscow
+    'TYO': ['NRT', 'HND'],  # Tokyo
+    'CHI': ['ORD', 'MDW'],  # Chicago
+    'MIL': ['MXP', 'LIN', 'BGY'],  # Milan
+    'ROM': ['FCO', 'CIA'],  # Rome
+    'LON': ['LHR', 'LGW', 'STN', 'LTN', 'LCY'],  # London
+    'SAO': ['GRU', 'CGH', 'VCP'],  # São Paulo
+    'RIO': ['GIG', 'SDU'],  # Rio
+    'BA': ['EZE', 'AEP'],  # Buenos Aires
+    'OSA': ['KIX', 'ITM'],  # Osaka
+    'BJS': ['PEK', 'PKX'],  # Beijing
+    'SHA': ['PVG', 'SHA'],  # Shanghai
+    'SEL': ['ICN', 'GMP'],  # Seoul
+    'STO': ['ARN', 'BMA', 'NYO', 'VST'],  # Stockholm
+}
+
+# Popular tourist destinations (score: 70)
+TOURIST_AIRPORTS = {
+    'DXB', 'BKK', 'SIN', 'HKG', 'BCN', 'ROM', 'VCE', 'FCO', 'ATH', 'IST',
+    'DPS', 'HKT', 'CNX', 'USM', 'KBV', 'HUI', 'CEB', 'MLE', 'HER', 'RHO',
+    'CFU', 'PMI', 'IBZ', 'AGP', 'ALC', 'FAO', 'FNC', 'TFS', 'LPA', 'ACE',
+    'SSH', 'HRG', 'MBJ', 'CUN', 'PUJ', 'SJO', 'PTY', 'LIR', 'GDL', 'PVR',
+    'SJD', 'CZM', 'ZIH', 'HMO', 'TIJ', 'REP', 'HAN', 'SGN', 'DAD', 'NHA',
+    'CNS', 'OOL', 'BNE', 'SYD', 'MEL', 'AKL', 'CHC', 'ZQN', 'NAN', 'PPT'
+}
+
+# ============================================================================
 # TRANSLITERATION MAPS
 # ============================================================================
 
@@ -327,25 +399,62 @@ class AirportService:
         return airports
     
     @staticmethod
+    def get_airport_popularity_score(iata_code: str) -> int:
+        """
+        Get popularity score for an airport.
+        
+        Returns:
+            100 - Major international hub
+            80  - Regional hub / large airport
+            70  - Tourist destination
+            60  - Capital city airport
+            40  - Medium airport
+            20  - Small airport
+        """
+        if iata_code in MAJOR_HUBS:
+            return 100
+        elif iata_code in REGIONAL_HUBS:
+            return 80
+        elif iata_code in TOURIST_AIRPORTS:
+            return 70
+        elif iata_code in CAPITAL_AIRPORTS:
+            return 60
+        else:
+            # Default scores based on IATA code patterns
+            # (Not perfect, but reasonable heuristic)
+            return 40  # Medium airport by default
+    
+    @staticmethod
     async def search_airports(
         query: str,
-        limit: int = 10
+        limit: int = 10,
+        user_country_code: Optional[str] = None
     ) -> List['AirportResponse']:
         """
-        Search airports with multi-language support.
+        Search airports with multi-language support, popularity ranking, and location awareness.
+        
+        Ranking factors:
+        1. Match quality (exact IATA, city prefix, etc.)
+        2. Airport popularity (major hubs ranked higher)
+        3. User's country (airports in user's country get bonus) ⭐ NEW
+        4. Passenger traffic (implicit via popularity lists)
         
         Examples:
+        - "L" → LHR, LGW, LAX, LIS (major airports starting with L)
+        - "Lo" → London airports (LHR, LGW, STN...), then Los Angeles
+        - "Lon" → All London airports first
         - "TAS" → Tashkent
         - "Ташкент" → Tashkent
         - "таш" → Tashkent
         - "Лондон" → London airports (LHR, LGW, etc.)
-        - "лон" → London airports
-        - "moscow" → Moscow airports
-        - "москва" → Moscow airports
+        
+        Location-aware:
+        - User in UK + "L" → UK airports (LHR, LGW) ranked higher
+        - User in US + "L" → US airports (LAX, LAS) ranked higher
         """
         from schemas.airports import AirportResponse
         
-        if len(query) < 2:
+        if len(query) < 1:
             return []
         
         all_airports = await AirportService._get_all_airports()
@@ -354,10 +463,24 @@ class AirportService:
         query_variants = AirportService.normalize_query(query)
         query_upper = query.upper()
         
+        logger.debug(f"Search: query='{query}', user_country={user_country_code}, variants={query_variants}")
+        
         # Search and rank results
         results = []
         for airport in all_airports:
             score = 0
+            
+            # Get popularity bonus
+            popularity_score = AirportService.get_airport_popularity_score(
+                airport['iata_code']
+            )
+            
+            # ⭐ NEW: Location-based bonus
+            location_bonus = 0
+            if user_country_code and airport.get('country_code') == user_country_code:
+                # Boost airports in user's country
+                location_bonus = 150
+                logger.debug(f"Location bonus applied for {airport['iata_code']} (user country: {user_country_code})")
             
             # Check against each query variant
             for variant in query_variants:
@@ -366,50 +489,63 @@ class AirportService:
                 
                 # IATA code exact match (highest priority)
                 if airport['iata_code'] == variant_upper:
-                    score = max(score, 100)
-                # IATA starts with variant
+                    score = max(score, 1000 + popularity_score + location_bonus)
+                # IATA starts with variant (very high priority for short queries)
                 elif airport['iata_code'].startswith(variant_upper):
-                    score = max(score, 90)
+                    score = max(score, 900 + popularity_score + location_bonus)
                 # City exact match
                 elif airport['city'].lower() == variant_lower:
-                    score = max(score, 85)
-                # City starts with variant
+                    score = max(score, 850 + popularity_score + location_bonus)
+                # City starts with variant (important for partial matches)
                 elif airport['city'].lower().startswith(variant_lower):
-                    score = max(score, 75)
+                    # Boost score more for longer matches
+                    match_quality = len(variant_lower) / len(airport['city'])
+                    score = max(score, 750 + popularity_score + location_bonus + int(match_quality * 50))
                 # Airport name starts with variant
                 elif airport['name'].lower().startswith(variant_lower):
-                    score = max(score, 65)
+                    score = max(score, 650 + popularity_score + location_bonus)
                 # City contains variant
                 elif variant_lower in airport['city'].lower():
-                    score = max(score, 55)
+                    score = max(score, 550 + popularity_score + location_bonus)
                 # Airport name contains variant
                 elif variant_lower in airport['name'].lower():
-                    score = max(score, 45)
+                    score = max(score, 450 + popularity_score + location_bonus)
                 # Country starts with variant
                 elif airport['country'].lower().startswith(variant_lower):
-                    score = max(score, 35)
+                    score = max(score, 350 + popularity_score + location_bonus)
                 # Country contains variant
                 elif variant_lower in airport['country'].lower():
-                    score = max(score, 25)
+                    score = max(score, 250 + popularity_score + location_bonus)
             
-            # Also check original query directly (in case transliteration missed something)
+            # Also check original query directly
             query_lower = query.lower()
             if query_lower in airport['city'].lower():
-                score = max(score, 50)
+                score = max(score, 500 + popularity_score + location_bonus)
             if query_lower in airport['name'].lower():
-                score = max(score, 40)
+                score = max(score, 400 + popularity_score + location_bonus)
+            
+            # Special handling for single-character queries
+            # Only return major airports to avoid overwhelming results
+            if len(query) == 1 and score > 0:
+                if popularity_score < 60:  # Skip small airports for single char
+                    continue
             
             if score > 0:
                 results.append({
                     'airport': airport,
-                    'score': score
+                    'score': score,
+                    'popularity': popularity_score,
+                    'in_user_country': location_bonus > 0
                 })
         
-        # Sort by score (descending)
-        results.sort(key=lambda x: x['score'], reverse=True)
+        # Sort by score (descending), then by popularity
+        results.sort(key=lambda x: (x['score'], x['popularity']), reverse=True)
         top_results = results[:limit]
         
-        logger.debug(f"Query '{query}' returned {len(top_results)} results")
+        logger.debug(
+            f"Query '{query}' returned {len(top_results)} results "
+            f"(filtered from {len(results)}, user_country={user_country_code})"
+        )
         
         return [
             AirportResponse(**item['airport'])

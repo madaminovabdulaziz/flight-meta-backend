@@ -1,17 +1,61 @@
 # app/api/v1/endpoints/airports.py
 
-from fastapi import APIRouter, Query, Path, HTTPException
-from typing import List
+from fastapi import APIRouter, Query, Path, HTTPException, Request
+from typing import List, Optional
 from services.airport_service import AirportService
 from schemas.airports import AirportResponse
 
+# --- IMPORTING YOUR REAL GEOLOCATION SERVICE ---
+from services.ip_geolocation import IPGeolocationService 
+# -----------------------------------------------
+import logging
+
+logger = logging.getLogger(__name__)
+
 router = APIRouter()
+# Initialize your real service
+geo_service = IPGeolocationService()
+
+
+async def _get_client_country_code(request: Request) -> Optional[str]:
+    """
+    Extracts client IP and determines country code using IPGeolocationService.
+    The response from the service is filtered for the 'country' field.
+    """
+    # Logic to extract client IP, prioritizing Cloudflare/Proxy headers
+    client_ip = request.client.host
+    forwarded = request.headers.get("X-Forwarded-For")
+    cf_ip = request.headers.get("CF-Connecting-IP")
+    
+    if cf_ip:
+        client_ip = cf_ip
+    elif forwarded:
+        client_ip = forwarded.split(",")[0].strip()
+
+    if client_ip in ["127.0.0.1", "::1", "testclient"]:
+        logger.debug(f"Skipping location lookup for local IP: {client_ip}")
+        return None
+
+    try:
+        # We call the full service method and extract the country code
+        result = await geo_service.get_nearest_airport_from_ip(client_ip)
+        
+        # Extract the country code from the detected_location part of your service's response
+        country_code = result.get("detected_location", {}).get("country")
+        
+        return country_code.upper() if country_code else None
+        
+    except Exception as e:
+        logger.warning(f"Failed to get country code for IP {client_ip}: {e}")
+        return None
+
 
 @router.get("/search", response_model=List[AirportResponse])
 async def search_airports(
+    request: Request,
     query: str = Query(
         ..., 
-        min_length=2, 
+        min_length=1, # Allows single character search
         max_length=100,
         description="Search term (city, airport name, or IATA code)"
     ),
@@ -25,25 +69,26 @@ async def search_airports(
     """
     🔍 Smart airport autocomplete search.
     
-    **Search by:**
-    - IATA codes (e.g., "JFK", "LHR")
-    - City names (e.g., "New York", "London")
-    - Airport names (e.g., "Heathrow", "Kennedy")
-    - Country names (e.g., "United States")
+    Results are prioritized by:
+    1. Match Quality (Exact IATA, City Match)
+    2. Multi-Airport City membership (e.g., LHR for LON query)
+    3. User's Country (via IP Geolocation)
+    4. Airport Popularity
     
-    **Ranking:**
-    1. Exact IATA code match (highest)
-    2. IATA code prefix match
-    3. City name match
-    4. Airport name match
-    5. Country name match
-    
-    **Data Source:** OpenFlights (cached for 24 hours)
+    **Non-commercial airfields are automatically filtered out.**
     """
+    # 1. Get the user's country code for location-based prioritization
+    user_country_code = await _get_client_country_code(request)
+    
     try:
-        results = await AirportService.search_airports(query=query, limit=limit)
+        results = await AirportService.search_airports(
+            query=query, 
+            limit=limit,
+            user_country_code=user_country_code # Pass the country code to the service
+        )
         return results
     except Exception as e:
+        logger.error(f"Search failed: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Search failed: {str(e)}")
 
 
@@ -59,8 +104,6 @@ async def get_airport(
 ):
     """
     Get specific airport details by IATA code.
-    
-    Example: `/airports/JFK`
     """
     airport = await AirportService.get_airport_by_iata(iata_code)
     
@@ -77,9 +120,6 @@ async def get_airport(
 async def refresh_airport_cache():
     """
     🔄 Manually refresh the airport data cache.
-    
-    Use this endpoint if you need to force-update the airport data
-    without waiting for the 24-hour TTL.
     """
     await AirportService.refresh_cache()
-    return None  # 204 No Content response
+    return None
