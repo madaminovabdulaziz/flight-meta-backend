@@ -195,12 +195,11 @@ def transform_baggage(passengers_baggage: List[Dict[str, Any]]) -> Dict[str, Any
         "carry_on": {
             "allowed": len(carry_on_bags) > 0,
             "quantity": sum(b["quantity"] for b in carry_on_bags),
-            "details": carry_on_bags[0] if carry_on_bags else None
+            
         },
         "checked": {
             "allowed": len(checked_bags) > 0,
             "quantity": sum(b["quantity"] for b in checked_bags),
-            "details": checked_bags[0] if checked_bags else None
         }
     }
 
@@ -404,11 +403,31 @@ def transform_offer(offer: Dict[str, Any], skip_expiration_check: bool = False) 
     # Transform slices
     transformed_slices = [transform_slice(s) for s in slices]
     
-    # Calculate total duration
-    total_duration_mins = sum(
-        parse_duration(s.get("duration", ""))["total_minutes"] 
-        for s in slices
-    )
+    # Calculate total duration - FIXED to handle missing slice duration
+    total_duration_mins = 0
+    
+    # Method 1: Use transformed slices (most reliable)
+    for transformed_slice in transformed_slices:
+        slice_duration = transformed_slice.get("duration", {})
+        if slice_duration and isinstance(slice_duration, dict):
+            total_duration_mins += slice_duration.get("total_minutes", 0)
+    
+    # Method 2: Fallback if transformed slices have 0 duration
+    if total_duration_mins == 0:
+        for slice_data in slices:
+            # Try to get duration from slice itself
+            slice_dur_str = slice_data.get("duration")
+            if slice_dur_str:
+                parsed = parse_duration(slice_dur_str)
+                total_duration_mins += parsed.get("total_minutes", 0)
+            else:
+                # Last resort: Calculate from all segments in this slice
+                segments = slice_data.get("segments", [])
+                for segment in segments:
+                    seg_dur_str = segment.get("duration")
+                    if seg_dur_str:
+                        parsed = parse_duration(seg_dur_str)
+                        total_duration_mins += parsed.get("total_minutes", 0)
     
     # Calculate max stops
     max_stops = max(
