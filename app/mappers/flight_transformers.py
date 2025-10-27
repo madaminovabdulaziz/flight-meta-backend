@@ -404,31 +404,32 @@ def transform_offer(offer: Dict[str, Any], skip_expiration_check: bool = False) 
     transformed_slices = [transform_slice(s) for s in slices]
     
     # Calculate total duration - FIXED to handle missing slice duration
+    # Calculate total duration - FIXED
     total_duration_mins = 0
-    
+
     # Method 1: Use transformed slices (most reliable)
     for transformed_slice in transformed_slices:
         slice_duration = transformed_slice.get("duration", {})
         if slice_duration and isinstance(slice_duration, dict):
             total_duration_mins += slice_duration.get("total_minutes", 0)
-    
-    # Method 2: Fallback if transformed slices have 0 duration
+
+    # Method 2: Fallback if Method 1 returns 0
     if total_duration_mins == 0:
         for slice_data in slices:
-            # Try to get duration from slice itself
+            # Try slice-level duration first
             slice_dur_str = slice_data.get("duration")
             if slice_dur_str:
                 parsed = parse_duration(slice_dur_str)
                 total_duration_mins += parsed.get("total_minutes", 0)
             else:
-                # Last resort: Calculate from all segments in this slice
+                # Calculate from segments
                 segments = slice_data.get("segments", [])
                 for segment in segments:
                     seg_dur_str = segment.get("duration")
                     if seg_dur_str:
                         parsed = parse_duration(seg_dur_str)
                         total_duration_mins += parsed.get("total_minutes", 0)
-    
+        
     # Calculate max stops
     max_stops = max(
         (max(0, len(s.get("segments", [])) - 1) for s in slices),

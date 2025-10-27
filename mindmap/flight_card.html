@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SkySearch AI - Compact Flight Card</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: #f5f5f5;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .flight-card {
+            background: white;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 16px 20px;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            transition: box-shadow 0.2s;
+        }
+
+        .flight-card:hover {
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .airline-section {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            min-width: 140px;
+        }
+
+        .airline-logo {
+            width: 32px;
+            height: 32px;
+            background: #f5f5f5;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            font-size: 11px;
+            color: #666;
+        }
+
+        .airline-name {
+            font-size: 14px;
+            color: #222;
+            font-weight: 500;
+        }
+
+        .route-section {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .time-location {
+            text-align: left;
+        }
+
+        .time {
+            font-size: 16px;
+            font-weight: 600;
+            color: #222;
+            margin-bottom: 2px;
+        }
+
+        .airport-code {
+            font-size: 12px;
+            color: #666;
+        }
+
+        .flight-path {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            min-width: 120px;
+        }
+
+        .duration {
+            font-size: 12px;
+            color: #666;
+            font-weight: 500;
+        }
+
+        .path-line {
+            width: 100%;
+            height: 1px;
+            background: #d0d0d0;
+            position: relative;
+        }
+
+        .stop-indicator {
+            font-size: 11px;
+            color: #059669;
+            font-weight: 600;
+        }
+
+        .stop-indicator.has-stops {
+            color: #ea580c;
+        }
+
+        .details-section {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding-left: 16px;
+            border-left: 1px solid #e0e0e0;
+        }
+
+        .detail-icons {
+            display: flex;
+            gap: 8px;
+        }
+
+        .icon-item {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 12px;
+            color: #666;
+        }
+
+        .icon-item svg {
+            width: 14px;
+            height: 14px;
+            stroke: currentColor;
+            fill: none;
+            stroke-width: 2;
+        }
+
+        .price-section {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 8px;
+            min-width: 120px;
+        }
+
+        .price {
+            font-size: 24px;
+            font-weight: 700;
+            color: #222;
+        }
+
+        .price-label {
+            font-size: 11px;
+            color: #666;
+        }
+
+        .view-deal-btn {
+            background: #ff6b35;
+            color: white;
+            border: none;
+            padding: 8px 20px;
+            border-radius: 4px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .view-deal-btn:hover {
+            background: #e55a2b;
+        }
+
+        .badges {
+            display: flex;
+            gap: 6px;
+            margin-bottom: 4px;
+        }
+
+        .badge {
+            font-size: 10px;
+            padding: 3px 8px;
+            border-radius: 3px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .badge-best {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+
+        .badge-cheapest {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        @media (max-width: 768px) {
+            .flight-card {
+                flex-direction: column;
+                align-items: stretch;
+                gap: 16px;
+            }
+
+            .details-section {
+                border-left: none;
+                border-top: 1px solid #e0e0e0;
+                padding-left: 0;
+                padding-top: 12px;
+                justify-content: space-between;
+            }
+
+            .price-section {
+                flex-direction: row;
+                align-items: center;
+                justify-content: space-between;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Flight Card 1 - Best Deal -->
+        <div class="flight-card">
+            <div class="airline-section">
+                <div class="airline-logo">SP</div>
+                <div class="airline-name">Spirit<br>Airlines</div>
+            </div>
+
+            <div class="route-section">
+                <div class="time-location">
+                    <div class="time">6:43 pm</div>
+                    <div class="airport-code">EWR</div>
+                </div>
+
+                <div class="flight-path">
+                    <div class="duration">1h 29m</div>
+                    <div class="path-line"></div>
+                    <div class="stop-indicator">nonstop</div>
+                </div>
+
+                <div class="time-location" style="text-align: right;">
+                    <div class="time">8:12 pm</div>
+                    <div class="airport-code">PIT</div>
+                </div>
+            </div>
+
+            <div class="details-section">
+                <div class="detail-icons">
+                    <div class="icon-item" title="Carry-on bag">
+                        <svg viewBox="0 0 24 24">
+                            <rect x="8" y="8" width="8" height="12" rx="1"/>
+                            <path d="M10 8V6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v2"/>
+                        </svg>
+                    </div>
+                    <div class="icon-item" title="Checked bag">
+                        <svg viewBox="0 0 24 24">
+                            <rect x="6" y="6" width="12" height="14" rx="2"/>
+                            <path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/>
+                        </svg>
+                    </div>
+                    <div class="icon-item" title="Seat selection">
+                        <svg viewBox="0 0 24 24">
+                            <path d="M5 12h14M5 12a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+
+            <div class="price-section">
+                <div class="badges">
+                    <span class="badge badge-best">Best</span>
+                </div>
+                <div class="price-wrapper">
+                    <div class="price">$46</div>
+                    <div class="price-label">Economy</div>
+                </div>
+                <button class="view-deal-btn">Select</button>
+            </div>
+        </div>
+
+        <!-- Flight Card 2 - With Stop -->
+        <div class="flight-card">
+            <div class="airline-section">
+                <div class="airline-logo">TK</div>
+                <div class="airline-name">Turkish<br>Airlines</div>
+            </div>
+
+            <div class="route-section">
+                <div class="time-location">
+                    <div class="time">2:15 pm</div>
+                    <div class="airport-code">LON</div>
+                </div>
+
+                <div class="flight-path">
+                    <div class="duration">8h 45m</div>
+                    <div class="path-line"></div>
+                    <div class="stop-indicator has-stops">1 stop</div>
+                </div>
+
+                <div class="time-location" style="text-align: right;">
+                    <div class="time">1:00 am</div>
+                    <div class="airport-code">DXB</div>
+                </div>
+            </div>
+
+            <div class="details-section">
+                <div class="detail-icons">
+                    <div class="icon-item" title="Carry-on: 8kg">
+                        <svg viewBox="0 0 24 24">
+                            <rect x="8" y="8" width="8" height="12" rx="1"/>
+                            <path d="M10 8V6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v2"/>
+                        </svg>
+                        <span>8kg</span>
+                    </div>
+                    <div class="icon-item" title="Checked: 23kg">
+                        <svg viewBox="0 0 24 24">
+                            <rect x="6" y="6" width="12" height="14" rx="2"/>
+                            <path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/>
+                        </svg>
+                        <span>23kg</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="price-section">
+                <div class="price-wrapper">
+                    <div class="price">$285</div>
+                    <div class="price-label">Economy</div>
+                </div>
+                <button class="view-deal-btn">Select</button>
+            </div>
+        </div>
+
+        <!-- Flight Card 3 - Cheapest -->
+        <div class="flight-card">
+            <div class="airline-section">
+                <div class="airline-logo">AA</div>
+                <div class="airline-name">American<br>Airlines</div>
+            </div>
+
+            <div class="route-section">
+                <div class="time-location">
+                    <div class="time">10:30 am</div>
+                    <div class="airport-code">JFK</div>
+                </div>
+
+                <div class="flight-path">
+                    <div class="duration">3h 15m</div>
+                    <div class="path-line"></div>
+                    <div class="stop-indicator">nonstop</div>
+                </div>
+
+                <div class="time-location" style="text-align: right;">
+                    <div class="time">1:45 pm</div>
+                    <div class="airport-code">LAX</div>
+                </div>
+            </div>
+
+            <div class="details-section">
+                <div class="detail-icons">
+                    <div class="icon-item">
+                        <svg viewBox="0 0 24 24">
+                            <rect x="8" y="8" width="8" height="12" rx="1"/>
+                            <path d="M10 8V6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v2"/>
+                        </svg>
+                    </div>
+                    <div class="icon-item">
+                        <svg viewBox="0 0 24 24">
+                            <rect x="6" y="6" width="12" height="14" rx="2"/>
+                            <path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+
+            <div class="price-section">
+                <div class="badges">
+                    <span class="badge badge-cheapest">Cheapest</span>
+                </div>
+                <div class="price-wrapper">
+                    <div class="price">$189</div>
+                    <div class="price-label">Economy</div>
+                </div>
+                <button class="view-deal-btn">Select</button>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

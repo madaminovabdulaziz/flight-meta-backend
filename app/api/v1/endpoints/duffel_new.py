@@ -437,7 +437,7 @@ class SearchRequest(BaseModel):
     supplier_timeout_ms: Optional[int] = None
     return_offers: bool = True
     page_size: int = Field(50, ge=1, le=250)
-    currency: Optional[str] = Field("USD", description="ISO 4217 currency code (e.g., USD, EUR, GBP, UZS)")
+    currency: str = Field(default="USD", description="ISO 4217 currency code (USD, EUR, GBP, UZS, etc.)")
 
 class PageMeta(BaseModel):
     page_size: int
@@ -741,8 +741,9 @@ async def search(req: SearchRequest, format: str = Query("clean")):
         data["max_connections"] = req.max_connections
     if req.supplier_timeout_ms is not None:
         data["supplier_timeout"] = req.supplier_timeout_ms
-    if req.currency:
-        data["currency"] = req.currency
+    
+    # ALWAYS send currency - defaults to USD
+    data["currency"] = req.currency
 
     # Create Offer Request
     resp = await duffel.create_offer_request(
