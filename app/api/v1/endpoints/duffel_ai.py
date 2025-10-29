@@ -78,7 +78,10 @@ class Config:
 
 # Timezone setup
 TASHKENT_TZ = timezone(timedelta(hours=5))
-TODAY_TASHKENT = datetime.now(TASHKENT_TZ).date()
+
+def get_today_tashkent() -> datetime:
+    """Get current date in Tashkent timezone - always fresh!"""
+    return datetime.now(TASHKENT_TZ).date()
 
 # Initialize IP Geolocation Service
 ip_geo_service = IPGeolocationService()
@@ -343,13 +346,17 @@ rate_limiter = RateLimiter(max_requests=Config.RATE_LIMIT_PER_MINUTE, window_sec
 def get_system_prompt(detected_origin: Optional[str] = None) -> str:
     """Generate context-aware system prompt with detected origin"""
     
+    # Get fresh date for this request
+    today = get_today_tashkent()
+    tomorrow = today + timedelta(days=1)
+    
     origin_context = ""
     if detected_origin:
         origin_context = f"\n**USER'S DETECTED LOCATION**: The user is near {detected_origin} airport. Use this as the default origin unless they explicitly specify otherwise."
     
     prompt = f"""You are an intelligent flight booking assistant.
 
-TODAY'S DATE: {TODAY_TASHKENT.isoformat()} (Asia/Tashkent timezone)
+TODAY'S DATE: {today.isoformat()} (Asia/Tashkent timezone)
 {origin_context}
 
 CRITICAL RULES:
@@ -392,7 +399,7 @@ CRITICAL RULES:
 }}
 
 4. **Date Interpretation**:
-   - "tomorrow" = {(TODAY_TASHKENT + timedelta(days=1)).isoformat()}
+   - "tomorrow" = {tomorrow.isoformat()}
    - "next week" = 7 days from today
    - "Christmas" = 2025-12-25
    - "New Year" = 2026-01-01
@@ -424,7 +431,7 @@ User: "I want to fly to Dubai tomorrow"
 {{
   "status": "COMPLETE",
   "search_payload": {{
-    "slices": [{{"origin": "TAS", "destination": "DXB", "departure_date": "{(TODAY_TASHKENT + timedelta(days=1)).isoformat()}"}}],
+    "slices": [{{"origin": "TAS", "destination": "DXB", "departure_date": "{tomorrow.isoformat()}"}}],
     "passengers": [{{"type": "adult"}}],
     "cabin_class": "economy",
     "max_connections": 1,
@@ -686,8 +693,9 @@ def generate_smart_suggestions(
     
     # Date suggestions
     if "departure_date" in str(missing_fields):
-        tomorrow = (TODAY_TASHKENT + timedelta(days=1)).isoformat()
-        next_week = (TODAY_TASHKENT + timedelta(days=7)).isoformat()
+        today = get_today_tashkent()
+        tomorrow = (today + timedelta(days=1)).isoformat()
+        next_week = (today + timedelta(days=7)).isoformat()
         
         suggestions.append(SmartSuggestion(
             text="Tomorrow",
