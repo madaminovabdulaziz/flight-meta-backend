@@ -1,10 +1,11 @@
-# duffel_ai_service_final.py — Production AI with IP Geolocation
+# duffel_ai_service_final.py — Production AI with IP Geolocation + Same Airport Validation
 """
 Complete production-ready conversational AI for flight search with:
 - Automatic origin detection via IP geolocation
+- Same origin-destination validation (PREVENTS TAS → TAS searches)
+- Smart alternative airport suggestions
 - Exact Duffel API response format
 - Smart conversation flow
-- All production features
 """
 
 from __future__ import annotations
@@ -87,6 +88,69 @@ def get_today_tashkent() -> datetime:
 ip_geo_service = IPGeolocationService()
 
 # ============================================================================
+# NEW: Alternative Airport Suggestions
+# ============================================================================
+ALTERNATIVE_AIRPORTS = {
+    "TAS": ["SKD", "BHK", "ALA"],  # Tashkent → Samarkand, Bukhara, Almaty
+    "SKD": ["TAS", "BHK", "DXB"],  # Samarkand → Tashkent, Bukhara, Dubai
+    "BHK": ["TAS", "SKD", "DXB"],  # Bukhara → Tashkent, Samarkand, Dubai
+    "IST": ["SAW", "AYT", "ESB"],  # Istanbul → Sabiha Gokcen, Antalya, Ankara
+    "SAW": ["IST", "AYT", "ESB"],  # Sabiha Gokcen → Istanbul, Antalya, Ankara
+    "DXB": ["AUH", "SHJ", "DOH"],  # Dubai → Abu Dhabi, Sharjah, Doha
+    "AUH": ["DXB", "SHJ", "DOH"],  # Abu Dhabi → Dubai, Sharjah, Doha
+    "LHR": ["LGW", "STN", "LCY"],  # London → Gatwick, Stansted, City
+    "LGW": ["LHR", "STN", "LCY"],  # Gatwick → Heathrow, Stansted, City
+    "JFK": ["EWR", "LGA", "PHL"],  # New York → Newark, LaGuardia, Philadelphia
+    "EWR": ["JFK", "LGA", "PHL"],  # Newark → JFK, LaGuardia, Philadelphia
+    "CDG": ["ORY", "BVA", "LHR"],  # Paris → Orly, Beauvais, London
+    "ORY": ["CDG", "BVA", "LHR"],  # Orly → CDG, Beauvais, London
+    "SVO": ["DME", "VKO", "IST"],  # Moscow → Domodedovo, Vnukovo, Istanbul
+    "DME": ["SVO", "VKO", "IST"],  # Domodedovo → Sheremetyevo, Vnukovo
+}
+
+AIRPORT_NAMES = {
+    "TAS": "Tashkent",
+    "SKD": "Samarkand",
+    "BHK": "Bukhara",
+    "ALA": "Almaty",
+    "IST": "Istanbul",
+    "SAW": "Istanbul Sabiha Gokcen",
+    "AYT": "Antalya",
+    "ESB": "Ankara",
+    "DXB": "Dubai",
+    "AUH": "Abu Dhabi",
+    "SHJ": "Sharjah",
+    "DOH": "Doha",
+    "LHR": "London Heathrow",
+    "LGW": "London Gatwick",
+    "STN": "London Stansted",
+    "LCY": "London City",
+    "JFK": "New York JFK",
+    "EWR": "New York Newark",
+    "LGA": "New York LaGuardia",
+    "PHL": "Philadelphia",
+    "CDG": "Paris CDG",
+    "ORY": "Paris Orly",
+    "BVA": "Paris Beauvais",
+    "SVO": "Moscow Sheremetyevo",
+    "DME": "Moscow Domodedovo",
+    "VKO": "Moscow Vnukovo",
+}
+
+def get_alternative_destinations(origin_iata: str) -> List[Dict[str, str]]:
+    """Get alternative destination suggestions when origin = destination"""
+    alternatives = ALTERNATIVE_AIRPORTS.get(origin_iata, ["DXB", "IST", "LHR"])
+    
+    return [
+        {
+            "iata": alt,
+            "city": AIRPORT_NAMES.get(alt, alt),
+            "message": f"Try {AIRPORT_NAMES.get(alt, alt)} ({alt}) instead?"
+        }
+        for alt in alternatives[:3]
+    ]
+
+# ============================================================================
 # Enums
 # ============================================================================
 class PromptType(str, Enum):
@@ -105,6 +169,7 @@ class ConversationStatus(str, Enum):
     COMPLETE = "COMPLETE"
     CLARIFICATION_NEEDED = "CLARIFICATION_NEEDED"
     ERROR = "ERROR"
+    VALIDATION_ERROR = "VALIDATION_ERROR"  # NEW: For same origin-destination
 
 class IntentType(str, Enum):
     SEARCH_FLIGHT = "SEARCH_FLIGHT"
@@ -186,6 +251,7 @@ class ConversationalResponse(BaseModel):
     detected_intent: Optional[IntentType] = None
     conversation_turn: int = 0
     detected_origin: Optional[Dict[str, Any]] = None  # IP-detected airport info
+    alternative_destinations: Optional[List[Dict[str, str]]] = None  # NEW
 
 class LLMResponse(BaseModel):
     status: str
@@ -208,7 +274,46 @@ class ConversationHistory(BaseModel):
     turn_count: int = 0
 
 # ============================================================================
-# Session Memory (same as before)
+# NEW: Validation Functions
+# ============================================================================
+def validate_origin_destination(origin: str, destination: str) -> Tuple[bool, Optional[str]]:
+    """
+    Validate that origin and destination are different airports
+    Returns: (is_valid, error_message)
+    """
+    if not origin or not destination:
+        return True, None
+    
+    if origin.upper() == destination.upper():
+        origin_name = AIRPORT_NAMES.get(origin.upper(), origin)
+        return False, f"You can't fly from {origin_name} to {origin_name}! Please choose a different destination. ✈️"
+    
+    return True, None
+
+def check_payload_for_same_airport(payload: Dict[str, Any]) -> Tuple[bool, Optional[str], Optional[str]]:
+    """
+    Check if any slice has same origin and destination
+    Returns: (is_valid, error_message, conflicting_origin)
+    """
+    if not payload or "slices" not in payload:
+        return True, None, None
+    
+    for slice_data in payload["slices"]:
+        origin = slice_data.get("origin", "").upper()
+        destination = slice_data.get("destination", "").upper()
+        
+        if origin and destination and origin == destination:
+            origin_name = AIRPORT_NAMES.get(origin, origin)
+            error_msg = (
+                f"Oops! You're trying to fly from {origin_name} to {origin_name}. "
+                f"That's not quite a trip! 😅 Where would you actually like to go?"
+            )
+            return False, error_msg, origin
+    
+    return True, None, None
+
+# ============================================================================
+# Session Memory
 # ============================================================================
 class MemoryABC:
     async def get(self, key: str) -> Optional[ConversationHistory]: ...
@@ -341,12 +446,11 @@ class RateLimiter:
 rate_limiter = RateLimiter(max_requests=Config.RATE_LIMIT_PER_MINUTE, window_seconds=60)
 
 # ============================================================================
-# Enhanced System Prompt with IP Origin
+# UPDATED: System Prompt with Validation Rules
 # ============================================================================
 def get_system_prompt(detected_origin: Optional[str] = None) -> str:
-    """Generate context-aware system prompt with detected origin"""
+    """Generate system prompt with detected origin and validation rules"""
     
-    # Get fresh date for this request
     today = get_today_tashkent()
     tomorrow = today + timedelta(days=1)
     
@@ -365,7 +469,19 @@ CRITICAL RULES:
    - DO NOT ask "where are you flying from?" if origin is already known
    - Only ask about origin if it's not detected AND user doesn't mention it
 
-2. **Time Fields**:
+2. **VALIDATION - Same Airport Check**:
+   - **NEVER** allow origin and destination to be the same airport
+   - If user says "I want to fly to Tashkent" and origin is already Tashkent, respond:
+     {{
+       "status": "INCOMPLETE",
+       "missing_fields": ["slices[0].destination"],
+       "clarification_prompt": "You're already in Tashkent! Where would you like to fly to? Perhaps Dubai, Istanbul, or Moscow?",
+       "detected_intent": "SEARCH_FLIGHT",
+       "confidence": 0.9
+     }}
+   - DO NOT include a search_payload with same origin and destination
+
+3. **Time Fields**:
    - ONLY include departure_time and arrival_time if user EXPLICITLY mentions time preferences
    - If user says "morning flight", include: {{"from": "06:00", "to": "12:00"}}
    - If user says "afternoon", include: {{"from": "12:00", "to": "18:00"}}
@@ -373,7 +489,7 @@ CRITICAL RULES:
    - If user says "night", include: {{"from": "00:00", "to": "06:00"}}
    - If NO time preference mentioned, EXCLUDE these fields entirely
 
-3. **Output Format** (EXACT Duffel API format):
+4. **Output Format** (EXACT Duffel API format):
 {{
   "status": "COMPLETE" | "INCOMPLETE",
   "detected_intent": "SEARCH_FLIGHT" | "MODIFY_SEARCH" | "ADD_INFO",
@@ -383,10 +499,10 @@ CRITICAL RULES:
   "search_payload": {{
     "slices": [{{
       "origin": "IATA_CODE",
-      "destination": "IATA_CODE",
+      "destination": "IATA_CODE",  // MUST BE DIFFERENT FROM ORIGIN
       "departure_date": "YYYY-MM-DD",
-      "departure_time": {{"from": "HH:MM", "to": "HH:MM"}},  // OPTIONAL - only if user mentions time
-      "arrival_time": {{"from": "HH:MM", "to": "HH:MM"}}     // OPTIONAL - only if user mentions time
+      "departure_time": {{"from": "HH:MM", "to": "HH:MM"}},  // OPTIONAL
+      "arrival_time": {{"from": "HH:MM", "to": "HH:MM"}}     // OPTIONAL
     }}],
     "passengers": [{{"type": "adult|child|infant_without_seat", "age": number}}],
     "cabin_class": "economy|premium_economy|business|first",
@@ -398,19 +514,19 @@ CRITICAL RULES:
   }}
 }}
 
-4. **Date Interpretation**:
+5. **Date Interpretation**:
    - "tomorrow" = {tomorrow.isoformat()}
    - "next week" = 7 days from today
    - "Christmas" = 2025-12-25
    - "New Year" = 2026-01-01
 
-5. **IATA Codes** (major airports):
+6. **IATA Codes** (major airports):
    - New York → JFK, London → LHR, Paris → CDG
    - Dubai → DXB, Istanbul → IST, Moscow → SVO
    - Tokyo → NRT, Hong Kong → HKG, Singapore → SIN
    - Tashkent → TAS, Samarkand → SKD, Bukhara → BHK
 
-6. **Default Values**:
+7. **Default Values**:
    - cabin_class: "economy"
    - passengers: [{{"type": "adult"}}]
    - max_connections: 1
@@ -419,10 +535,11 @@ CRITICAL RULES:
    - page_size: 50
    - currency: "USD"
 
-7. **Conversation Flow**:
+8. **Conversation Flow**:
    - Be friendly and natural
    - Only ask about missing REQUIRED fields: destination, departure_date
    - Don't ask about optional fields unless user seems interested
+   - If origin = destination, suggest popular alternatives
 
 EXAMPLES:
 
@@ -430,6 +547,8 @@ User: "I want to fly to Dubai tomorrow"
 [Origin detected: TAS]
 {{
   "status": "COMPLETE",
+  "detected_intent": "SEARCH_FLIGHT",
+  "confidence": 0.95,
   "search_payload": {{
     "slices": [{{"origin": "TAS", "destination": "DXB", "departure_date": "{tomorrow.isoformat()}"}}],
     "passengers": [{{"type": "adult"}}],
@@ -442,31 +561,22 @@ User: "I want to fly to Dubai tomorrow"
   }}
 }}
 
-User: "Morning flight to London next Monday"
+User: "I want to fly to Tashkent"
 [Origin detected: TAS]
 {{
-  "status": "COMPLETE",
-  "search_payload": {{
-    "slices": [{{
-      "origin": "TAS",
-      "destination": "LHR",
-      "departure_date": "2025-10-27",
-      "departure_time": {{"from": "06:00", "to": "12:00"}}
-    }}],
-    "passengers": [{{"type": "adult"}}],
-    "cabin_class": "economy",
-    "max_connections": 1,
-    "supplier_timeout_ms": 10000,
-    "return_offers": true,
-    "page_size": 50,
-    "currency": "USD"
-  }}
+  "status": "INCOMPLETE",
+  "detected_intent": "SEARCH_FLIGHT",
+  "confidence": 0.8,
+  "missing_fields": ["slices[0].destination"],
+  "clarification_prompt": "You're already in Tashkent! Where would you like to travel to? Popular destinations include Dubai, Istanbul, Moscow, or London."
 }}
 
 User: "Business class to Paris"
 [Origin detected: TAS]
 {{
   "status": "INCOMPLETE",
+  "detected_intent": "SEARCH_FLIGHT",
+  "confidence": 0.85,
   "missing_fields": ["slices[0].departure_date"],
   "clarification_prompt": "When would you like to fly to Paris?",
   "search_payload": {{
@@ -750,11 +860,12 @@ def personalize_message(
 # FastAPI Application
 # ============================================================================
 app = FastAPI(
-    title="Duffel AI Conversational Search with IP Geolocation",
-    version="2.1.0",
-    description="Production-ready AI flight search with automatic origin detection",
+    title="Duffel AI Flight Search",
+    description="Conversational AI for flight search with IP geolocation + Same Airport Validation",
+    version="2.0.0"
 )
 
+# CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -763,44 +874,21 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-router = APIRouter(prefix="/chat", tags=["Conversational AI"])
+router = APIRouter(prefix="/api/v1", tags=["chat"])
 
 # ============================================================================
-# Endpoints
+# Main Conversational Endpoint with VALIDATION
 # ============================================================================
-
-@app.get("/health")
-async def health_check():
-    """Health check endpoint"""
-    return {
-        "status": "healthy",
-        "gemini_configured": bool(Config.GEMINI_API_KEY),
-        "redis_available": isinstance(memory, RedisStore),
-        "ip_geolocation_enabled": Config.ENABLE_IP_GEOLOCATION,
-        "model": Config.GEMINI_MODEL,
-        "timestamp": datetime.now(TASHKENT_TZ).isoformat()
-    }
-
-@app.get("/")
-async def root():
-    return {
-        "service": "Duffel AI Conversational Search",
-        "version": "2.1.0",
-        "features": ["IP Geolocation", "Smart Session Management", "Exact Duffel Format"],
-        "docs": "/docs"
-    }
-
-@router.post("/search", response_model=ConversationalResponse)
-async def chat_search(
+@router.post("/chat", response_model=ConversationalResponse)
+async def conversational_search(
     chat_query: ChatQuery,
     request: Request,
-    x_request_id: Optional[str] = Header(None)
-):
+    x_user_id: Optional[str] = Header(None)
+) -> ConversationalResponse:
     """
-    Main conversational search endpoint with automatic origin detection.
+    Conversational flight search with AI + IP geolocation + SAME AIRPORT VALIDATION
     
-    The origin airport is automatically detected from the user's IP address,
-    so the AI won't ask "where are you flying from?"
+    NOW PREVENTS IMPOSSIBLE SEARCHES (e.g., TAS → TAS)
     """
     
     # Get client IP
@@ -905,6 +993,45 @@ async def chat_search(
             if not slice_data.get("origin") and detected_origin_iata:
                 slice_data["origin"] = detected_origin_iata
     
+    # ============================================================================
+    # NEW: VALIDATION CHECKPOINT 1 - Check for same origin-destination
+    # ============================================================================
+    is_valid, validation_error, conflicting_origin = check_payload_for_same_airport(merged_payload)
+    
+    if not is_valid:
+        # Get alternative destination suggestions
+        alternatives = get_alternative_destinations(conflicting_origin)
+        
+        # Create friendly suggestions
+        suggestions = [
+            SmartSuggestion(
+                text=alt["message"],
+                action="set_destination",
+                data={"destination": alt["iata"]}
+            )
+            for alt in alternatives
+        ]
+        
+        logger.warning(f"Same airport validation triggered: {conflicting_origin} → {conflicting_origin}")
+        
+        history.messages.append(ChatMessage(role="assistant", content=validation_error))
+        await memory.set(session_id, history)
+        
+        return ConversationalResponse(
+            status=ConversationStatus.VALIDATION_ERROR,
+            message=validation_error,
+            suggestions=suggestions,
+            alternative_destinations=alternatives,
+            session_id=session_id,
+            prompt_type=PromptType.CITY_SELECTOR,
+            conversation_turn=history.turn_count,
+            detected_origin=detected_origin_info
+        )
+    
+    # ============================================================================
+    # Continue with normal flow
+    # ============================================================================
+    
     # Set defaults (EXACT Duffel format)
     merged_payload.setdefault("currency", "USD")
     merged_payload.setdefault("max_connections", 1)
@@ -938,6 +1065,37 @@ async def chat_search(
             destination = final_payload["slices"][0]["destination"]
             date = final_payload["slices"][0]["departure_date"]
             cabin = final_payload.get("cabin_class", "economy")
+            
+            # ============================================================================
+            # NEW: VALIDATION CHECKPOINT 2 - Final check before marking COMPLETE
+            # ============================================================================
+            is_valid, validation_error = validate_origin_destination(origin, destination)
+            if not is_valid:
+                alternatives = get_alternative_destinations(origin)
+                suggestions = [
+                    SmartSuggestion(
+                        text=alt["message"],
+                        action="set_destination",
+                        data={"destination": alt["iata"]}
+                    )
+                    for alt in alternatives
+                ]
+                
+                logger.warning(f"Final validation failed: {origin} → {destination}")
+                
+                history.messages.append(ChatMessage(role="assistant", content=validation_error))
+                await memory.set(session_id, history)
+                
+                return ConversationalResponse(
+                    status=ConversationStatus.VALIDATION_ERROR,
+                    message=validation_error,
+                    suggestions=suggestions,
+                    alternative_destinations=alternatives,
+                    session_id=session_id,
+                    prompt_type=PromptType.CITY_SELECTOR,
+                    conversation_turn=history.turn_count,
+                    detected_origin=detected_origin_info
+                )
             
             message = f"Perfect! I've prepared your search for {cabin} class flights from {origin} to {destination} on {date}. Ready to search!"
             message = personalize_message(message, history, llm_response.detected_intent)
@@ -1012,3 +1170,20 @@ async def create_session():
     """Create a new session ID"""
     session_id = str(uuid.uuid4())
     return {"session_id": session_id}
+
+@router.get("/health")
+async def health_check():
+    """Health check endpoint"""
+    return {
+        "status": "healthy",
+        "service": "Duffel AI with Same Airport Validation",
+        "version": "2.0.0",
+        "features": {
+            "ip_geolocation": Config.ENABLE_IP_GEOLOCATION,
+            "same_airport_validation": True,
+            "smart_suggestions": Config.ENABLE_SMART_SUGGESTIONS,
+            "personalization": Config.ENABLE_PERSONALIZATION
+        },
+        "timestamp": datetime.now(TASHKENT_TZ).isoformat()
+    }
+
