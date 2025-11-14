@@ -92,3 +92,35 @@ watchfiles==1.1.0
 wcwidth==0.2.14
 websockets==15.0.1
 yarl==1.22.0
+
+# ============================================================
+# PRODUCTION AI ARCHITECTURE DEPENDENCIES
+# Added for world-class multi-model agentic system
+# ============================================================
+
+# LLM Multi-Provider Support
+litellm==1.59.9                    # Unified interface for OpenAI, Anthropic, Google
+anthropic==0.43.1                  # Claude Sonnet/Opus support
+
+# Semantic Search & Embeddings
+sentence-transformers==3.3.1       # Local embeddings for semantic caching
+transformers==4.48.3               # Required by sentence-transformers
+torch==2.5.1                       # Required by sentence-transformers (CPU version)
+scikit-learn==1.6.1                # For similarity calculations
+numpy==1.26.4                      # Vector operations
+
+# NER & PII Detection (Optional - for guardrails)
+spacy==3.8.3                       # Named Entity Recognition for PII detection
+# python -m spacy download en_core_web_sm  # Run after install
+
+# Structured Outputs
+instructor==1.7.3                  # Structured outputs from LLMs
+pydantic-settings>=2.11.0          # Already installed, but ensure version
+
+# Observability & Monitoring (Optional)
+langfuse==2.57.4                   # LLM observability and analytics
+langsmith==0.3.7                   # LangChain observability
+
+# Additional Utilities
+tiktoken==0.9.0                    # Token counting for cost estimation
+backoff==2.2.1                     # Exponential backoff for retries
