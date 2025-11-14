@@ -517,12 +517,12 @@ async def get_stats(
 ) -> Dict[str, Any]:
     """
     Get conversation system statistics.
-    
+
     **Admin endpoint** - consider adding authentication in production.
     """
     try:
         stats = await service.context_manager.get_stats()
-        
+
         return {
             "conversation_system": stats,
             "settings": {
@@ -536,5 +536,235 @@ async def get_stats(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error getting statistics: {str(e)}"
+        )
+
+
+# ============================================================
+# NEW: PRODUCTION AI ENDPOINTS
+# ============================================================
+
+class KnowledgeQueryRequest(BaseModel):
+    """Request body for knowledge base query"""
+    query: str = Field(..., description="User query", max_length=500)
+    doc_type: Optional[str] = Field(None, description="Document type filter")
+
+
+class ReActQueryRequest(BaseModel):
+    """Request body for ReAct agent"""
+    session_id: str = Field(..., description="Session ID")
+    query: str = Field(..., description="Complex user query", max_length=500)
+
+
+@router.post("/knowledge", response_model=Dict[str, Any])
+async def query_knowledge_base(
+    request_body: KnowledgeQueryRequest,
+    service: ConversationService = Depends(get_conversation_service)
+) -> Dict[str, Any]:
+    """
+    Query RAG knowledge base for travel information.
+
+    **Use cases:**
+    - "Do I need a visa for Turkey?" → Retrieves visa rules
+    - "What's Emirates baggage allowance?" → Retrieves airline policies
+    - "Best time to visit Dubai?" → Retrieves destination guides
+
+    **Example request:**
+```json
+    {
+        "query": "I have a US passport, do I need a visa for Turkey?",
+        "doc_type": "visa_rules"
+    }
+```
+
+    **Example response:**
+```json
+    {
+        "query": "...",
+        "retrieved_docs": [
+            {
+                "title": "Turkey Visa Requirements for US Citizens",
+                "content": "US passport holders can enter Turkey visa-free...",
+                "relevance": 0.95
+            }
+        ],
+        "generated_answer": "No, US passport holders can enter Turkey visa-free for up to 90 days.",
+        "has_results": true
+    }
+```
+    """
+    try:
+        logger.info(f"Knowledge query: '{request_body.query[:50]}...'")
+
+        result = await service.query_knowledge_base(
+            query=request_body.query,
+            doc_type=request_body.doc_type
+        )
+
+        if "error" in result:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=result["error"]
+            )
+
+        logger.info(
+            f"✓ Knowledge query complete: "
+            f"{len(result.get('retrieved_docs', []))} docs retrieved"
+        )
+
+        return result
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(f"Error in knowledge query: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error querying knowledge base: {str(e)}"
+        )
+
+
+@router.post("/react", response_model=Dict[str, Any])
+async def run_react_agent(
+    request_body: ReActQueryRequest,
+    service: ConversationService = Depends(get_conversation_service)
+) -> Dict[str, Any]:
+    """
+    Run ReAct agent for complex queries with autonomous reasoning.
+
+    **The Game-Changer**: Agent thinks, acts, and saves you money!
+
+    **Example request:**
+```json
+    {
+        "session_id": "550e8400-e29b-41d4-a716-446655440000",
+        "query": "Find me the cheapest way to fly to Tokyo next month"
+    }
+```
+
+    **Example response:**
+```json
+    {
+        "final_answer": "I found flights for $1200, BUT if you leave 2 days earlier, I found one for $800 - that's $400 cheaper! Would you like to see both options?",
+        "reasoning_chain": [
+            {
+                "step": 1,
+                "thought": "User wants cheapest option. Let me search first.",
+                "action": "SEARCH_FLIGHTS",
+                "observation": {"cheapest_price": 1200}
+            },
+            {
+                "step": 2,
+                "thought": "That's expensive! Let me check flexible dates to save money.",
+                "action": "CHECK_FLEXIBLE_DATES",
+                "observation": {"best_deal": {"price": 800, "savings": 400}}
+            }
+        ],
+        "total_steps": 2
+    }
+```
+    """
+    try:
+        logger.info(
+            f"ReAct agent query: session={request_body.session_id}, "
+            f"query='{request_body.query[:50]}...'"
+        )
+
+        # Get conversation context
+        context_data = await service.get_conversation_history(request_body.session_id)
+
+        if "error" in context_data:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Session not found"
+            )
+
+        # Build context for agent
+        trip_spec = context_data.get("trip_spec", {})
+        agent_context = {
+            "origin": trip_spec.get("origin"),
+            "destination": trip_spec.get("destination"),
+            "depart_date": trip_spec.get("depart_date"),
+            "passengers": trip_spec.get("passengers", 1)
+        }
+
+        # Run agent
+        result = await service.run_react_agent(
+            user_query=request_body.query,
+            context=agent_context
+        )
+
+        if "error" in result:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=result["error"]
+            )
+
+        logger.info(
+            f"✓ ReAct agent complete: "
+            f"{result.get('total_steps', 0)} reasoning steps"
+        )
+
+        return result
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(f"Error in ReAct agent: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error running ReAct agent: {str(e)}"
+        )
+
+
+@router.get("/ai-stats", response_model=Dict[str, Any])
+async def get_ai_stats(
+    service: ConversationService = Depends(get_conversation_service)
+) -> Dict[str, Any]:
+    """
+    Get production AI system statistics.
+
+    **Admin endpoint** - Shows performance metrics from:
+    - LLM Gateway (model routing, cost savings)
+    - Semantic Cache (hit rate, latency)
+    - Guardrails (PII detection count)
+
+    **Example response:**
+```json
+    {
+        "llm_gateway": {
+            "total_calls": 1000,
+            "cache_hit_rate": "70.0%",
+            "total_cost": 5.40,
+            "by_provider": {"gemini": 850, "openai": 150}
+        },
+        "semantic_cache": {
+            "total_lookups": 1000,
+            "cache_hits": 700,
+            "hit_rate": "70.0%"
+        },
+        "guardrails": {
+            "audit_log_entries": 15
+        }
+    }
+```
+    """
+    try:
+        stats = service.get_ai_stats()
+
+        return {
+            "production_ai": stats,
+            "timestamp": datetime.utcnow().isoformat(),
+            "features": {
+                "llm_gateway": stats.get("llm_gateway") is not None,
+                "semantic_cache": stats.get("semantic_cache") is not None,
+                "guardrails": stats.get("guardrails") is not None
+            }
+        }
+
+    except Exception as e:
+        logger.exception(f"Error getting AI stats: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error getting AI statistics: {str(e)}"
         )
 
