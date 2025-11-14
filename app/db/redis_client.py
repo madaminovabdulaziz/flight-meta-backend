@@ -34,7 +34,7 @@ async def init_redis() -> redis.Redis:
         _redis_pool = ConnectionPool.from_url(
             settings.REDIS_URI,
             encoding="utf-8",
-            decode_responses=False,  # Keep as bytes for compression
+            decode_responses=True,  # ✅ CHANGED: True for conversation sessions (strings)
             max_connections=50,
             socket_connect_timeout=5,
             socket_keepalive=True,
@@ -55,12 +55,27 @@ async def init_redis() -> redis.Redis:
         raise
 
 
-async def get_redis() -> redis.Redis:
+def get_redis() -> redis.Redis:  # ✅ CHANGED: NOT async!
     """
-    Get Redis client instance.
+    Get Redis client instance (SYNC function).
     
-    Use this as a dependency in FastAPI routes:
+    ⚠️ IMPORTANT: This function is NOT async!
+    - Client initialization is synchronous
+    - Client OPERATIONS (get, set, etc.) are async and must be awaited
+    
+    Usage in FastAPI routes:
     ```python
+    from app.db.redis_client import get_redis
+    
+    async def my_route():
+        redis = get_redis()  # No await here
+        await redis.set("key", "value")  # Await operations
+    ```
+    
+    Usage in dependencies:
+    ```python
+    from fastapi import Depends
+    
     async def my_route(redis: Redis = Depends(get_redis)):
         await redis.set("key", "value")
     ```
@@ -68,7 +83,27 @@ async def get_redis() -> redis.Redis:
     global _redis_client
     
     if _redis_client is None:
-        _redis_client = await init_redis()
+        # For sync context, create client directly without await
+        # The connection isn't established until first operation
+        global _redis_pool
+        
+        try:
+            _redis_pool = ConnectionPool.from_url(
+                settings.REDIS_URI,
+                encoding="utf-8",
+                decode_responses=True,  # Return strings, not bytes
+                max_connections=50,
+                socket_connect_timeout=5,
+                socket_keepalive=True,
+                health_check_interval=30
+            )
+            
+            _redis_client = redis.Redis(connection_pool=_redis_pool)
+            logger.info("Redis client initialized (lazy connection)")
+            
+        except Exception as e:
+            logger.error(f"Failed to initialize Redis client: {e}")
+            raise
     
     return _redis_client
 
@@ -99,8 +134,8 @@ async def health_check() -> bool:
     Returns True if Redis is accessible, False otherwise.
     """
     try:
-        client = await get_redis()
-        await client.ping()
+        client = get_redis()  # ✅ No await
+        await client.ping()   # ✅ Await operation
         return True
     except Exception as e:
         logger.error(f"Redis health check failed: {e}")
@@ -109,32 +144,33 @@ async def health_check() -> bool:
 
 # ==================== HELPER FUNCTIONS ====================
 
-async def cache_get(key: str) -> Optional[bytes]:
+async def cache_get(key: str) -> Optional[str]:  # ✅ CHANGED: Returns str now
     """
     Get value from cache.
     
-    Returns bytes or None if not found.
+    Returns string or None if not found.
     """
     try:
-        client = await get_redis()
-        return await client.get(key)
+        client = get_redis()  # ✅ No await
+        value = await client.get(key)  # ✅ Await operation
+        return value
     except Exception as e:
         logger.error(f"Cache get error for key {key}: {e}")
         return None
 
 
-async def cache_set(key: str, value: bytes, ttl: int = 300):
+async def cache_set(key: str, value: str, ttl: int = 300):  # ✅ CHANGED: value is str
     """
     Set value in cache with TTL.
     
     Args:
         key: Cache key
-        value: Value to cache (bytes)
+        value: Value to cache (string)
         ttl: Time to live in seconds (default 5 minutes)
     """
     try:
-        client = await get_redis()
-        await client.setex(key, ttl, value)
+        client = get_redis()  # ✅ No await
+        await client.setex(key, ttl, value)  # ✅ Await operation
     except Exception as e:
         logger.error(f"Cache set error for key {key}: {e}")
 
@@ -142,8 +178,8 @@ async def cache_set(key: str, value: bytes, ttl: int = 300):
 async def cache_delete(key: str):
     """Delete key from cache"""
     try:
-        client = await get_redis()
-        await client.delete(key)
+        client = get_redis()  # ✅ No await
+        await client.delete(key)  # ✅ Await operation
     except Exception as e:
         logger.error(f"Cache delete error for key {key}: {e}")
 
@@ -151,8 +187,8 @@ async def cache_delete(key: str):
 async def cache_exists(key: str) -> bool:
     """Check if key exists in cache"""
     try:
-        client = await get_redis()
-        return await client.exists(key) > 0
+        client = get_redis()  # ✅ No await
+        return await client.exists(key) > 0  # ✅ Await operation
     except Exception as e:
         logger.error(f"Cache exists error for key {key}: {e}")
         return False
@@ -161,8 +197,8 @@ async def cache_exists(key: str) -> bool:
 async def cache_ttl(key: str) -> int:
     """Get remaining TTL for key in seconds"""
     try:
-        client = await get_redis()
-        return await client.ttl(key)
+        client = get_redis()  # ✅ No await
+        return await client.ttl(key)  # ✅ Await operation
     except Exception as e:
         logger.error(f"Cache TTL error for key {key}: {e}")
         return -1
@@ -175,7 +211,7 @@ async def cache_flush_pattern(pattern: str):
     Example: cache_flush_pattern("duffel:offer:*")
     """
     try:
-        client = await get_redis()
+        client = get_redis()  # ✅ No await
         cursor = 0
         
         while True:
@@ -197,9 +233,9 @@ async def get_cache_stats() -> dict:
     Returns info about memory usage, keys, etc.
     """
     try:
-        client = await get_redis()
-        info = await client.info("stats")
-        memory = await client.info("memory")
+        client = get_redis()  # ✅ No await
+        info = await client.info("stats")  # ✅ Await operation
+        memory = await client.info("memory")  # ✅ Await operation
         
         return {
             "total_keys": await client.dbsize(),
@@ -216,3 +252,19 @@ async def get_cache_stats() -> dict:
     except Exception as e:
         logger.error(f"Failed to get cache stats: {e}")
         return {}
+
+
+# ==================== STARTUP HELPER ====================
+
+async def ensure_redis_initialized():
+    """
+    Ensure Redis is initialized and test connection.
+    Call this in your FastAPI startup event.
+    """
+    try:
+        client = get_redis()
+        await client.ping()
+        logger.info("✅ Redis initialized and connection verified")
+    except Exception as e:
+        logger.error(f"❌ Redis initialization failed: {e}")
+        raise
