@@ -62,6 +62,33 @@ class PaymentProvider(enum.Enum):
 
 
 # ==========================
+# AI TRIP PLANNER ENUMS
+# ==========================
+
+class MemoryType(enum.Enum):
+    """Types of memories for AI Trip Planner personalization"""
+    PREFERENCE = "preference"      # Explicit user preferences
+    TRIP_HISTORY = "trip_history"  # Past trip patterns
+    BEHAVIOR = "behavior"          # Observed patterns from choices
+    FEEDBACK = "feedback"          # Corrections or dislikes
+
+
+class SessionStatus(enum.Enum):
+    """AI Trip Planner conversation session status"""
+    ACTIVE = "active"
+    COMPLETED = "completed"
+    ABANDONED = "abandoned"
+
+
+class TripPlanStatus(enum.Enum):
+    """AI Trip Planner trip planning status (distinct from booking status)"""
+    PLANNING = "planning"                # User is planning
+    PLANNED = "planned"                  # User completed planning
+    BOOKED_ELSEWHERE = "booked_elsewhere"  # User booked on partner site
+    CANCELLED = "cancelled"              # User cancelled plan
+
+
+# ==========================
 # CORE: USERS
 # ==========================
 
@@ -86,6 +113,12 @@ class User(Base):
     bookings = relationship("Booking", back_populates="user", cascade="all, delete-orphan")
     payments = relationship("Payment", back_populates="user")
     saved_searches = relationship("SavedSearch", back_populates="user", cascade="all, delete-orphan")
+    
+    # AI Trip Planner relationships
+    ai_sessions = relationship("AISession", back_populates="user", cascade="all, delete-orphan")
+    trip_plans = relationship("TripPlan", back_populates="user", cascade="all, delete-orphan")
+    preferences = relationship("UserPreference", back_populates="user", cascade="all, delete-orphan")
+    memory_events = relationship("MemoryEvent", back_populates="user", cascade="all, delete-orphan")
 
 
 # ==========================
@@ -365,6 +398,183 @@ class SavedSearch(Base):
     __table_args__ = (
         Index('idx_search_user_active', 'user_id', 'is_active'),
         Index('idx_alert_active_expires', 'is_price_alert', 'is_active', 'expires_at'),
+    )
+
+
+# ==========================
+# AI TRIP PLANNER MODELS
+# ==========================
+
+class AISession(Base):
+    """
+    AI Trip Planner conversation sessions.
+    Tracks the state machine flow for collecting flight parameters.
+    """
+    __tablename__ = "ai_sessions"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    
+    # User tracking (NULL for anonymous users)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+    
+    # Session identification
+    session_token = Column(String(255), unique=True, nullable=False, index=True)
+    
+    # Complete state object (from Part 2 of spec)
+    # Contains: destination, origin, dates, passengers, class, budget, flexibility
+    # Also contains: missing_parameter, last_question, conversation_history, etc.
+    state_json = Column(JSON, nullable=False)
+    
+    # Status
+    status = Column(SQLAlchemyEnum(SessionStatus), default=SessionStatus.ACTIVE, nullable=False, index=True)
+    
+    # Timestamps
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    
+    # Relationships
+    user = relationship("User", back_populates="ai_sessions")
+    trip_plans = relationship("TripPlan", back_populates="session")
+    memory_events = relationship("MemoryEvent", back_populates="session")
+    
+    __table_args__ = (
+        Index('idx_ai_session_user_status', 'user_id', 'status'),
+        Index('idx_ai_session_created', 'created_at'),
+    )
+
+
+class TripPlan(Base):
+    """
+    AI Trip Planner trip plans (distinct from Booking).
+    Represents a planned trip that may or may not result in a booking.
+    Links to Booking when user books through partners or directly.
+    """
+    __tablename__ = "trip_plans"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    
+    # User and session
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    session_id = Column(Integer, ForeignKey("ai_sessions.id", ondelete="SET NULL"), nullable=True)
+    
+    # Flight details (collected from AI conversation)
+    origin = Column(String(3), nullable=False, index=True)
+    destination = Column(String(3), nullable=False, index=True)
+    departure_date = Column(Date, nullable=False)
+    return_date = Column(Date, nullable=True)
+    
+    passengers = Column(Integer, default=1, nullable=False)
+    travel_class = Column(String(50), nullable=True)
+    budget = Column(Float, nullable=True)
+    flexibility = Column(Integer, nullable=True)  # Days of flexibility
+    
+    # Status
+    status = Column(SQLAlchemyEnum(TripPlanStatus), default=TripPlanStatus.PLANNING, nullable=False, index=True)
+    
+    # Link to actual booking if user booked
+    booking_id = Column(Integer, ForeignKey("bookings.id", ondelete="SET NULL"), nullable=True)
+    
+    # Recommended flights snapshot (from ranking engine)
+    recommended_flights_json = Column(JSON, nullable=True)
+    
+    # Timestamps
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    completed_at = Column(DateTime(timezone=True), nullable=True)
+    
+    # Relationships
+    user = relationship("User", back_populates="trip_plans")
+    session = relationship("AISession", back_populates="trip_plans")
+    booking = relationship("Booking")
+    
+    __table_args__ = (
+        Index('idx_trip_plan_user_status', 'user_id', 'status'),
+        Index('idx_trip_plan_route_date', 'origin', 'destination', 'departure_date'),
+    )
+
+
+class UserPreference(Base):
+    """
+    AI Trip Planner structured preferences (Layer 2 of memory system).
+    Stores machine-readable preferences as key-value pairs.
+    
+    Examples:
+    - key="preferred_airports", value_json=["LGW", "LHR"]
+    - key="preferred_airlines", value_json=["TK", "QR"]
+    - key="budget_range", value_json=[200, 500]
+    - key="prefers_direct", value_json=true
+    """
+    __tablename__ = "user_preferences"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    
+    # User reference
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    
+    # Preference key (e.g., "preferred_airports", "budget_range")
+    key = Column(String(100), nullable=False)
+    
+    # Preference value as JSON (supports lists, dicts, primitives)
+    value_json = Column(JSON, nullable=False)
+    
+    # Timestamps
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    
+    # Relationships
+    user = relationship("User", back_populates="preferences")
+    
+    __table_args__ = (
+        Index('idx_user_preference_key', 'user_id', 'key', unique=True),
+    )
+
+
+class MemoryEvent(Base):
+    """
+    AI Trip Planner memory events (Layer 3 bridge to Qdrant vector DB).
+    Logs memory-worthy events that get embedded and stored in Qdrant.
+    This MySQL table serves as an audit trail and bridge.
+    
+    Memory Types:
+    - PREFERENCE: Explicit user preferences ("I prefer Turkish Airlines")
+    - TRIP_HISTORY: Past trips and experiences
+    - BEHAVIOR: Observed patterns ("User always chooses cheapest option")
+    - FEEDBACK: Corrections or dislikes ("I hate overnight layovers")
+    """
+    __tablename__ = "memory_events"
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    
+    # User and session references
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    session_id = Column(Integer, ForeignKey("ai_sessions.id", ondelete="SET NULL"), nullable=True)
+    
+    # Memory details
+    type = Column(SQLAlchemyEnum(MemoryType), nullable=False, index=True)
+    
+    # Natural language summary of the memory
+    content = Column(Text, nullable=False)
+    
+    # Additional metadata as JSON
+    # Examples:
+    # - {"category": "airline", "airline": "TK", "importance": "high"}
+    # - {"category": "stops", "importance": "high", "confidence": 0.9}
+    # - {"destination": "IST", "trip_date": "2025-03-15", "satisfaction": "high"}
+    metadata_json = Column(JSON, nullable=True)
+    
+    # Reference to corresponding vector in Qdrant
+    vector_id = Column(String(255), nullable=True, index=True)
+    
+    # Timestamp
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
+    
+    # Relationships
+    user = relationship("User", back_populates="memory_events")
+    session = relationship("AISession", back_populates="memory_events")
+    
+    __table_args__ = (
+        Index('idx_memory_user_type', 'user_id', 'type'),
+        Index('idx_memory_created', 'created_at'),
     )
 
 
