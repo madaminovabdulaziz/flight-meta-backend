@@ -1,70 +1,62 @@
+
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import asyncio
+
 from app.core.config import settings
 from app.db.database import engine, Base
 from app.api.v1.endpoints import (
-    ai_trip,
-    airports,
     auth,
+    nearest_airport,
+    email_collection,
+    duffel_new,
+    airports,
     duffel_ai,
     duffel_flexible,
-    duffel_new,
-    email_collection,
-    nearest_airport,
+    chat,
 )
 
+# --- QDRANT INITIALIZATION ---
+from app.integrations.qdrant_client import qdrant_service
+
+
+# ============================================================
+# DATABASE INITIALIZATION
+# ============================================================
 async def create_db_and_tables():
     async with engine.begin() as conn:
-        # This will create tables based on your models
         await conn.run_sync(Base.metadata.create_all)
 
-# app/main.py - Update FastAPI initialization
 
+# ============================================================
+# FASTAPI APP SETUP
+# ============================================================
 app = FastAPI(
     title="SkySearch AI - Flight Metasearch Engine",
     description="""
     🚀 **Intelligent Flight Search API**
-    
-    SkySearch AI is a next-generation flight metasearch platform that combines 
-    traditional search with AI-powered features.
-    
+
+    SkySearch AI is a next-generation flight metasearch platform
+    that combines traditional search with AI-powered features.
+
     ## Features
-    
-    * 🔍 **Smart Search**: Traditional and AI-powered flight search
-    * 🔥 **Hot Routes**: Discover popular destinations with best prices
-    * ✈️ **Airport Data**: Comprehensive airport information
-    * 📊 **Analytics**: Click tracking and conversion monitoring
-    
-    ## Authentication
-    
-    Most endpoints are public. User-specific features require Bearer token authentication.
-    
-    ## Rate Limits
-    
-    * Public endpoints: 100 requests/minute per IP
-    * Authenticated: 1000 requests/minute per user
-    
-    ## Support
-    
-    Contact: support@skysearch.ai
+    * 🔍 Smart & AI-powered flight search
+    * 🔥 Hot Routes discovery
+    * ✈️ Airport information
+    * 📊 Analytics & monitoring
     """,
     version="1.0.0",
-    contact={
-        "name": "SkySearch AI Team",
-        "email": "support@skysearch.ai",
-    },
-    license_info={
-        "name": "Proprietary",
-    },
-    # Custom OpenAPI URL (useful for versioning)
+    contact={"name": "SkySearch AI Team", "email": "support@skysearch.ai"},
+    license_info={"name": "Proprietary"},
     docs_url="/docs",
     redoc_url="/redoc",
-    openapi_url="/api/v1/openapi.json"
+    openapi_url="/api/v1/openapi.json",
 )
 
-
-# Set up CORS middleware
+# ============================================================
+# CORS CONFIG
+# ============================================================
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.BACKEND_CORS_ORIGINS,
@@ -74,21 +66,31 @@ app.add_middleware(
 )
 
 
+# ============================================================
+# STARTUP EVENT (CRITICAL FOR QDRANT)
+# ============================================================
+async def startup_event():
+    await qdrant_service.connect()
 
-# Include your API routers here
+    print("🚀 Application startup complete — Qdrant and DB initialized.")
+
+
+# ============================================================
+# API ROUTERS
+# ============================================================
 app.include_router(auth.router, prefix=f"{settings.API_V1_STR}/auth", tags=["auth"])
 app.include_router(nearest_airport.router, prefix=f"{settings.API_V1_STR}/nearest-airport", tags=["nearest airport"])
 app.include_router(airports.router, prefix=f"{settings.API_V1_STR}/airports", tags=["airports"])
 app.include_router(duffel_new.router, prefix=f"{settings.API_V1_STR}/duffel-search", tags=["Duffel Flights"])
 app.include_router(duffel_ai.router)
-app.include_router(ai_trip.router)
 app.include_router(duffel_flexible.router)
-#app.include_router(flights.router, prefix=f"{settings.API_V1_STR}/flights", tags=["flights"])
-#app.include_router(clicks.router, prefix=f"{settings.API_V1_STR}/clicks", tags=["clicks"])
+app.include_router(chat.router)
 app.include_router(email_collection.router, prefix=f"{settings.API_V1_STR}/email-post", tags=["post email"])
-#app.include_router(airports.router, prefix=f"{settings.API_V1_STR}/airports", tags=["airports"])
 
+
+# ============================================================
+# ROOT ENDPOINT
+# ============================================================
 @app.get("/")
 def read_root():
     return {"message": "Welcome to the FlyUz Flight Aggregator API"}
-
