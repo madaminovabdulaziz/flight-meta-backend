@@ -1,32 +1,22 @@
 """
-LangGraph Flow Definition (HYBRID VERSION)
-Main orchestration graph with rule-based/LLM routing for AI Trip Planner.
-
-KEY CHANGE: Added should_use_llm_node for intelligent routing.
-
-Flow now has TWO paths:
-1. RULE-BASED PATH (fast, cheap):
-   - skip classify_intent_node (use local classifier)
-   - skip extract_parameters_node (use rule extractor)
-   - use template_engine for questions
-   - use cheap_ranker for flights
-
-2. LLM PATH (fallback):
-   - full LLM nodes when confidence is low
-   - same quality, slower, more expensive
-
-Expected savings: 80-100% cost reduction, 75% latency reduction
+LangGraph Flow Definition - Production-Ready Hybrid Architecture
+================================================================
+Main orchestration graph with intelligent rule-based/LLM routing for AI Trip Planner.
 """
 
 import logging
 from typing import Literal, Optional
+
 from langgraph.graph import StateGraph, END
 
-from app.langgraph_flow.state import ConversationState
+from app.langgraph_flow.state import ConversationState, create_initial_state
 from app.langgraph_flow.nodes.entry_node import entry_node
 from app.langgraph_flow.nodes.load_session_state_node import load_session_state_node
 from app.langgraph_flow.nodes.load_user_memory_node import load_user_memory_node
-from app.langgraph_flow.nodes.should_use_llm_node import should_use_llm_node, route_based_on_confidence
+from app.langgraph_flow.nodes.should_use_llm_node import (
+    should_use_llm_node,
+    route_based_on_confidence,
+)
 from app.langgraph_flow.nodes.classify_intent_node import classify_intent_node
 from app.langgraph_flow.nodes.extract_parameters_node import extract_parameters_node
 from app.langgraph_flow.nodes.determine_missing_slot_node import determine_missing_slot_node
@@ -36,7 +26,7 @@ from app.langgraph_flow.nodes.flight_search_node import flight_search_node
 from app.langgraph_flow.nodes.ranking_node import ranking_node
 from app.langgraph_flow.nodes.finalize_response_node import finalize_response_node
 
-# Import new rule-based nodes (to be created separately)
+# Rule-based path nodes
 from app.langgraph_flow.nodes.rule_based_question_node import rule_based_question_node
 from app.langgraph_flow.nodes.rule_based_ranking_node import rule_based_ranking_node
 
@@ -44,222 +34,187 @@ logger = logging.getLogger(__name__)
 
 
 # ==========================================
-# CONDITIONAL EDGE FUNCTIONS
+# CONDITIONAL EDGE FUNCTIONS - DECISION READERS ONLY
 # ==========================================
 
 def route_after_intent_classification(
-    state: ConversationState
+    state: ConversationState,
 ) -> Literal["refusal", "extract_parameters"]:
     """
     Route based on intent classification (LLM path only).
-    
-    If intent is 'irrelevant' or 'chitchat' → refusal_node
-    Otherwise → extract_parameters_node
+    DECISION READER: Only reads intent from state.
     """
-    intent = state.get("intent", "")
-    
+    intent = getattr(state, "intent", "") or ""
+
     if intent in ["irrelevant", "chitchat"]:
-        logger.info(f"Intent '{intent}' detected → routing to refusal_node")
+        logger.info(f"[Route] Intent '{intent}' → refusal_node")
         return "refusal"
-    
-    logger.info(f"Intent '{intent}' detected → routing to extract_parameters")
+
+    logger.info(f"[Route] Intent '{intent}' → extract_parameters")
     return "extract_parameters"
 
 
 def route_after_missing_slot_check(
-    state: ConversationState
+    state: ConversationState,
 ) -> Literal["ask_question", "rule_question", "flight_search"]:
     """
-    Route based on missing parameters and which path we're on.
-    
-    If missing_parameter exists:
-        - If rule-based path → rule_based_question_node
-        - If LLM path → ask_next_question_node (LLM)
-    
-    If all slots filled → flight_search_node
+    Route after checking for missing parameters.
+    DECISION READER: Only reads from state, NEVER recalculates.
     """
-    missing_param = state.get("missing_parameter")
-    use_rule_based = state.get("use_rule_based_path", False)
-    
-    if missing_param:
-        if use_rule_based:
-            logger.info(f"Missing parameter: {missing_param} → routing to rule_based_question (NO LLM)")
-            return "rule_question"
-        else:
-            logger.info(f"Missing parameter: {missing_param} → routing to ask_question (LLM)")
-            return "ask_question"
-    
-    logger.info("All slots filled → routing to flight_search")
-    return "flight_search"
+    missing = getattr(state, "missing_parameter", None)
+
+    if not missing:
+        logger.info("[Route] No missing parameters → flight_search")
+        return "flight_search"
+
+    use_rule_based = getattr(state, "use_rule_based_path", False)
+
+    if use_rule_based:
+        logger.info(
+            f"[Route] Missing '{missing}' + rule-based path → rule_question (template)"
+        )
+        return "rule_question"
+
+    logger.info(f"[Route] Missing '{missing}' + LLM path → ask_question (LLM)")
+    return "ask_question"
 
 
 def route_after_flight_search(
-    state: ConversationState
+    state: ConversationState,
 ) -> Literal["rule_ranking", "llm_ranking"]:
     """
     Route to appropriate ranking node based on path.
-    
-    Rule-based path → cheap_ranker (no LLM)
-    LLM path → full ranking with explanations
+    DECISION READER: Only reads from state, NEVER recalculates.
     """
-    use_rule_based = state.get("use_rule_based_path", False)
-    
+    use_rule_based = getattr(state, "use_rule_based_path", False)
+
     if use_rule_based:
-        logger.info("→ Routing to rule_based_ranking (cheap_ranker)")
+        logger.info(
+            "[Route] Rule-based path → rule_ranking (cheap_ranker, 0 LLM calls)"
+        )
         return "rule_ranking"
-    else:
-        logger.info("→ Routing to llm_ranking")
-        return "llm_ranking"
+
+    logger.info("[Route] LLM path → llm_ranking (with explanations)")
+    return "llm_ranking"
 
 
 # ==========================================
-# GRAPH CONSTRUCTION (HYBRID VERSION)
+# GRAPH CONSTRUCTION
 # ==========================================
 
 def create_trip_planner_graph() -> StateGraph:
     """
-    Build the HYBRID LangGraph with rule-based/LLM routing.
-    
-    Flow:
-    1. EntryNode
-    2. LoadSessionStateNode
-    3. LoadUserMemoryNode
-    4. **ShouldUseLLMNode** ← THE KEY ROUTING NODE
-    5. Branch:
-       
-       RULE-BASED PATH (high confidence):
-       → DetermineMissingSlotNode
-       → RuleBasedQuestionNode (templates) → END
-       → OR FlightSearchNode → RuleBasedRankingNode (cheap_ranker) → END
-       
-       LLM PATH (low confidence):
-       → ClassifyIntentNode (LLM)
-       → ExtractParametersNode (LLM)
-       → DetermineMissingSlotNode
-       → AskNextQuestionNode (LLM) → END
-       → OR FlightSearchNode → RankingNode (LLM) → END
-    
-    Expected performance:
-    - 80-95% of requests use rule-based path
-    - 5-20% fallback to LLM
-    - 80-100% cost savings
-    - 75% latency reduction
+    Build the production-ready hybrid LangGraph with clean separation of concerns.
     """
-    
+
     graph = StateGraph(ConversationState)
-    
-    # ==========================================
-    # ADD ALL NODES (including new routing nodes)
-    # ==========================================
-    
+
+    # ------------------------
+    # NODE REGISTRATION
+    # ------------------------
+
+    # Common entry nodes
     graph.add_node("entry", entry_node)
     graph.add_node("load_session_state", load_session_state_node)
     graph.add_node("load_user_memory", load_user_memory_node)
-    
-    # **THE KEY ROUTING NODE**
+
+    # Router
     graph.add_node("should_use_llm", should_use_llm_node)
-    
+
     # LLM path nodes
     graph.add_node("classify_intent", classify_intent_node)
     graph.add_node("extract_parameters", extract_parameters_node)
     graph.add_node("ask_question", ask_next_question_node)
     graph.add_node("llm_ranking", ranking_node)
-    
+
     # Rule-based path nodes
     graph.add_node("rule_question", rule_based_question_node)
     graph.add_node("rule_ranking", rule_based_ranking_node)
-    
+
     # Shared nodes
     graph.add_node("determine_missing_slot", determine_missing_slot_node)
     graph.add_node("refusal", refusal_node)
     graph.add_node("flight_search", flight_search_node)
     graph.add_node("finalize_response", finalize_response_node)
-    
-    # ==========================================
-    # DEFINE EDGES (HYBRID FLOW)
-    # ==========================================
-    
-    # Set entry point
+
+    # ------------------------
+    # EDGE DEFINITIONS
+    # ------------------------
+
     graph.set_entry_point("entry")
-    
-    # Linear flow: Entry → LoadSession → LoadMemory → ShouldUseLLM
+
+    # Common entry flow
     graph.add_edge("entry", "load_session_state")
     graph.add_edge("load_session_state", "load_user_memory")
     graph.add_edge("load_user_memory", "should_use_llm")
-    
-    # **CRITICAL ROUTING DECISION**
+
+    # Routing decision
     graph.add_conditional_edges(
         "should_use_llm",
         route_based_on_confidence,
         {
-            "rule_based_path": "determine_missing_slot",  # Skip LLM nodes!
-            "llm_path": "classify_intent",  # Use LLM nodes
-        }
+            "rule_based_path": "determine_missing_slot",
+            "llm_path": "classify_intent",
+        },
     )
-    
-    # LLM PATH: classify_intent → refusal OR extract_parameters
+
+    # LLM path
     graph.add_conditional_edges(
         "classify_intent",
         route_after_intent_classification,
         {
             "refusal": "refusal",
             "extract_parameters": "extract_parameters",
-        }
+        },
     )
-    
-    # LLM PATH: extract_parameters → determine_missing_slot
+
     graph.add_edge("extract_parameters", "determine_missing_slot")
-    
-    # Refusal → END
     graph.add_edge("refusal", END)
-    
-    # After missing slot check: route to appropriate question node or flight search
+
+    # Missing slot → ask / rule / search
     graph.add_conditional_edges(
         "determine_missing_slot",
         route_after_missing_slot_check,
         {
-            "ask_question": "ask_question",  # LLM question
-            "rule_question": "rule_question",  # Template question
+            "ask_question": "ask_question",
+            "rule_question": "rule_question",
             "flight_search": "flight_search",
-        }
+        },
     )
-    
-    # Question nodes → END (wait for user)
+
     graph.add_edge("ask_question", END)
     graph.add_edge("rule_question", END)
-    
-    # FlightSearch → route to appropriate ranking
+
+    # Flight search → ranking
     graph.add_conditional_edges(
         "flight_search",
         route_after_flight_search,
         {
             "rule_ranking": "rule_ranking",
             "llm_ranking": "llm_ranking",
-        }
+        },
     )
-    
-    # Ranking nodes → finalize → END
+
     graph.add_edge("rule_ranking", "finalize_response")
     graph.add_edge("llm_ranking", "finalize_response")
     graph.add_edge("finalize_response", END)
-    
-    logger.info("✅ HYBRID Trip Planner graph constructed successfully")
-    
+
+    logger.info("✅ Production-ready trip planner graph constructed")
     return graph
 
 
 # ==========================================
-# COMPILED GRAPH (READY TO USE)
+# COMPILED GRAPH SINGLETON
 # ==========================================
 
 trip_planner_graph = create_trip_planner_graph().compile()
 
-logger.info("✅ HYBRID LangGraph flow compiled and ready")
-logger.info("🚀 Routing enabled: Rule-based path for 80-95% of requests")
+logger.info("✅ Trip planner graph compiled and ready")
+logger.info("🚀 Performance target: 80-95% requests use rule-based path")
 
 
 # ==========================================
-# GRAPH EXECUTION HELPER
+# GRAPH EXECUTION
 # ==========================================
 
 async def run_conversation_turn(
@@ -268,99 +223,188 @@ async def run_conversation_turn(
     user_message: str,
 ) -> ConversationState:
     """
-    Execute one turn of the conversation with hybrid routing.
-    
-    The graph will automatically decide whether to use:
-    - Rule-based path (fast, cheap)
-    - LLM path (fallback)
-    
-    Args:
-        session_id: Session identifier
-        user_id: User ID (None for anonymous)
-        user_message: Latest user input
-    
-    Returns:
-        Updated ConversationState after graph execution
+    Execute one conversation turn with proper state persistence.
     """
-    from app.langgraph_flow.state import create_initial_state
-    
-    initial_state = create_initial_state(
-        session_id=session_id,
-        user_id=user_id,
-        latest_message=user_message,
+    from app.db.database import AsyncSessionLocal
+    from app.db.crud.session import load_session_state, save_session_state
+    from services.session_store import (
+        get_session_state_from_redis,
+        save_session_state_to_redis,
     )
-    
-    logger.info(f"🚀 Starting HYBRID conversation turn for session {session_id}")
+
+    logger.info(f"🚀 Starting conversation turn for session {session_id}")
+
+    # ------------------------
+    # STEP 1: LOAD EXISTING STATE (Redis first, then DB)
+    # ------------------------
+    initial_state: Optional[ConversationState] = None
     
     try:
-        final_state = await trip_planner_graph.ainvoke(initial_state)
+        # Try Redis first (faster)
+        redis_state = await get_session_state_from_redis(session_id)
         
-        # Log which path was used
-        used_rule_based = final_state.get("use_rule_based_path", False)
-        confidence = final_state.get("confidence_breakdown", {}).get("overall_confidence", 0)
-        
-        if used_rule_based:
-            logger.info(f"✅ Completed via RULE-BASED path (confidence: {confidence:.2f}) - ZERO LLM cost!")
-        else:
-            logger.info(f"⚠️ Completed via LLM path (confidence: {confidence:.2f}) - fallback used")
-        
-        return final_state
-    
+        if redis_state and isinstance(redis_state, dict):
+            # Convert Redis dict to ConversationState
+            allowed_fields = set(ConversationState.__dataclass_fields__.keys())
+            filtered = {k: v for k, v in redis_state.items() if k in allowed_fields}
+            initial_state = ConversationState(**filtered)
+            logger.info(f"📂 Loaded state from Redis (turn {initial_state.turn_count or 0})")
+            
     except Exception as e:
-        logger.error(f"Error in conversation turn: {e}", exc_info=True)
+        logger.warning(f"⚠️ Redis load failed: {e}, trying DB...")
+
+    # Fallback to DB if Redis failed
+    if initial_state is None:
+        try:
+            async with AsyncSessionLocal() as db:
+                db_state = await load_session_state(db, session_id=session_id)
+                
+                if db_state:
+                    if isinstance(db_state, ConversationState):
+                        initial_state = db_state
+                    elif isinstance(db_state, dict):
+                        allowed_fields = set(ConversationState.__dataclass_fields__.keys())
+                        filtered = {k: v for k, v in db_state.items() if k in allowed_fields}
+                        initial_state = ConversationState(**filtered)
+                    
+                    logger.info(f"📂 Loaded state from DB (turn {initial_state.turn_count or 0})")
+                    
+        except Exception as e:
+            logger.warning(f"⚠️ DB load failed: {e}")
+
+    # Create new state if nothing was loaded
+    if initial_state is None:
+        logger.info("🆕 Creating new session")
+        initial_state = create_initial_state(
+            session_id=session_id,
+            user_id=user_id,
+            latest_message=user_message,
+        )
+    else:
+        # Update existing state for new turn
+        logger.info(f"📝 Continuing existing session (turn {initial_state.turn_count + 1})")
+
+    # Update state with current turn info
+    initial_state.turn_count = (initial_state.turn_count or 0) + 1
+    initial_state.latest_user_message = user_message
+    
+    # Append to conversation history
+    if not initial_state.conversation_history:
+        initial_state.conversation_history = []
+    initial_state.conversation_history.append({
+        "role": "user",
+        "content": user_message,
+        "turn": initial_state.turn_count,
+    })
+
+    # ------------------------
+    # STEP 2: EXECUTE GRAPH
+    # ------------------------
+    try:
+        result = await trip_planner_graph.ainvoke(initial_state)
+
+        # Convert result to ConversationState if needed
+        if isinstance(result, dict):
+            allowed_fields = set(ConversationState.__dataclass_fields__.keys())
+            filtered_result = {k: v for k, v in result.items() if k in allowed_fields}
+            final_state = ConversationState(**filtered_result)
+        elif isinstance(result, ConversationState):
+            final_state = result
+        else:
+            logger.error(f"❌ Unexpected result type: {type(result)}")
+            raise TypeError(f"Expected dict or ConversationState, got {type(result)}")
+
+        # Add assistant response to conversation history
+        if final_state.assistant_message:
+            if not final_state.conversation_history:
+                final_state.conversation_history = []
+            final_state.conversation_history.append({
+                "role": "assistant",
+                "content": final_state.assistant_message,
+                "turn": final_state.turn_count,
+            })
+
+        # Log path used
+        used_rule_based = getattr(final_state, "use_rule_based_path", False)
+        confidence = getattr(final_state, "routing_confidence", 0.0) or 0.0
+
+        if used_rule_based:
+            logger.info(
+                f"✅ RULE-BASED path completed "
+                f"(confidence: {confidence:.3f}, 0 LLM calls, ~300-800ms)"
+            )
+        else:
+            logger.info(
+                f"⚠️ LLM path completed "
+                f"(confidence: {confidence:.3f}, ~3 LLM calls, ~2-4s)"
+            )
+
+    except Exception as e:
+        logger.error(f"❌ Graph execution failed: {e}", exc_info=True)
         raise
 
+    # ------------------------
+    # STEP 3: *** SAVE STATE *** (THE MISSING PIECE!)
+    # ------------------------
+    try:
+        # Save to Redis (fast, temporary)
+        await save_session_state_to_redis(session_id, final_state)
+        logger.debug("✅ State saved to Redis")
+        
+        # Save to DB (persistent, slower) - do in background if possible
+        async with AsyncSessionLocal() as db:
+            await save_session_state(db, session_id=session_id, state=final_state)
+            await db.commit()
+        logger.debug("✅ State saved to DB")
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to save state: {e}", exc_info=True)
+        # Don't fail the request if save fails, but log it prominently
+        # The state is still returned to the user
+
+    return final_state
 
 # ==========================================
 # GRAPH VISUALIZATION
 # ==========================================
 
-def visualize_graph() -> str:
+def get_graph_stats(state: ConversationState) -> dict:
     """
-    Mermaid diagram of HYBRID graph structure.
+    Extract performance statistics from final state.
     """
-    return """
-    graph TD
-        START([User Message]) --> entry[Entry Node]
-        entry --> load_session[Load Session State]
-        load_session --> load_memory[Load User Memory]
-        load_memory --> should_llm{Should Use LLM?}
-        
-        should_llm -->|HIGH confidence| determine[Determine Missing Slot]
-        should_llm -->|LOW confidence| classify[Classify Intent - LLM]
-        
-        classify -->|irrelevant| refusal[Refusal]
-        classify -->|travel| extract[Extract Parameters - LLM]
-        extract --> determine
-        
-        determine -->|missing + rule path| rule_q[Rule Question - Template]
-        determine -->|missing + LLM path| ask_q[Ask Question - LLM]
-        determine -->|complete| search[Flight Search]
-        
-        rule_q --> END1([END])
-        ask_q --> END2([END])
-        refusal --> END3([END])
-        
-        search -->|rule path| rule_rank[Rule Ranking - Cheap]
-        search -->|LLM path| llm_rank[LLM Ranking]
-        
-        rule_rank --> finalize[Finalize Response]
-        llm_rank --> finalize
-        finalize --> END4([END])
-        
-        classDef ruleClass fill:#4CAF50,stroke:#2E7D32,color:#fff
-        classDef llmClass fill:#FF9800,stroke:#E65100,color:#fff
-        classDef routingClass fill:#2196F3,stroke:#0D47A1,color:#fff
-        
-        class rule_q,rule_rank ruleClass
-        class classify,extract,ask_q,llm_rank llmClass
-        class should_llm routingClass
-    """
+    use_rule = getattr(state, "use_rule_based_path", False)
+    confidence = getattr(state, "routing_confidence", None)
+    breakdown = getattr(state, "confidence_breakdown", None)
+    turn_count = getattr(state, "turn_count", None)
+    intent = getattr(state, "intent", None)
+    session_id = getattr(state, "session_id", None)
+
+    return {
+        "path_used": "rule_based" if use_rule else "llm",
+        "routing_confidence": confidence,
+        "confidence_breakdown": breakdown,
+        "turn_count": turn_count,
+        "intent": intent,
+        "estimated_llm_calls": 0 if use_rule else 3,
+        "session_id": session_id,
+    }
 
 
-if __name__ == "__main__":
-    print("=" * 80)
-    print("AI TRIP PLANNER - HYBRID LANGGRAPH FLOW")
-    print("=" * 80)
-    print(visualize_graph())
-    print("=" * 80)
+# ==========================================
+# HEALTH CHECK
+# ==========================================
+
+def validate_graph_health() -> bool:
+    """
+    Validate that graph is properly constructed.
+    """
+    try:
+        if trip_planner_graph is None:
+            logger.error("Graph is None")
+            return False
+
+        logger.info("✅ Graph health check passed")
+        return True
+    except Exception as e:
+        logger.error(f"❌ Graph health check failed: {e}")
+        return False

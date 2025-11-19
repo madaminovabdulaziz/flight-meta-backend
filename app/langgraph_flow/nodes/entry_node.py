@@ -12,16 +12,16 @@ async def entry_node(state: ConversationState) -> ConversationState:
 
     logger.info("[EntryNode] Starting new turn")
 
-    # Initialize conversation history if missing
-    history = state.get("conversation_history") or []
-    
+    # Initialize conversation history
+    history = state.conversation_history or []
+
     # Append latest user message
-    latest_msg = state.get("latest_user_message", "")
+    latest_msg = state.latest_user_message
     if latest_msg:
         history.append({"role": "user", "content": latest_msg})
 
     # Increment turn count
-    turn_count = state.get("turn_count", 0) + 1
+    turn_count = state.turn_count + 1
 
     return update_state(state, {
         "conversation_history": history,

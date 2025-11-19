@@ -1,18 +1,6 @@
 """
-Should Use LLM Node
-The routing decision node that enables hybrid rule-based/LLM flow.
-
-This is THE KEY NODE that determines whether to use:
-- Fast rule-based path (no LLM, <100ms, $0 cost)
-- Fallback LLM path (slower, $$$)
-
-Philosophy:
-- Use rules when confident (85%+ confidence)
-- Use LLM only when rules fail
-- This single decision saves 80-100% of LLM costs
-
-Usage in graph:
-    load_user_memory → should_use_llm → [rule_path | llm_path]
+Should Use LLM Node – Dataclass-Safe Version
+============================================
 """
 
 import logging
@@ -24,187 +12,246 @@ from services.rule_based_extractor import rule_extractor
 
 logger = logging.getLogger(__name__)
 
+# ============================================================================
+# CONFIG
+# ============================================================================
+
+CONFIDENCE_THRESHOLD = 0.85
+INTENT_WEIGHT = 0.6
+EXTRACTION_WEIGHT = 0.4
+MAX_COMPLETENESS_BONUS = 0.15
+MAX_DEPTH_BONUS = 0.10
+COMPLETENESS_BONUS_PER_SLOT = 0.04
+DEPTH_BONUS_PER_TURN = 0.02
+
 
 # ============================================================================
-# CONFIDENCE SCORING SYSTEM
+# CONFIDENCE COMPONENTS
 # ============================================================================
 
 def _calculate_overall_confidence(
     intent_confidence: float,
     extraction_confidence: float,
-    state: ConversationState
+    filled_slots: int,
+    turn_count: int
 ) -> Tuple[float, Dict[str, Any]]:
-    """
-    Calculate overall confidence score from multiple signals.
-    
-    Signals:
-    1. Intent classification confidence (0.0-1.0)
-    2. Parameter extraction confidence (0.0-1.0)
-    3. State completeness bonus (more filled slots = higher confidence)
-    4. Conversation context (early turns = lower confidence)
-    
-    Returns:
-        (overall_confidence, confidence_breakdown)
-    """
-    
-    # Base confidence from classifiers
-    base_confidence = (intent_confidence * 0.6 + extraction_confidence * 0.4)
-    
-    # State completeness bonus
-    filled_slots = sum([
-        1 if state.get("destination") else 0,
-        1 if state.get("origin") else 0,
-        1 if state.get("departure_date") else 0,
-        1 if state.get("passengers") else 0,
-    ])
-    completeness_bonus = min(0.15, filled_slots * 0.04)  # Max +0.15
-    
-    # Conversation depth bonus (later turns = more context = higher confidence)
-    turn_count = state.get("turn_count", 0)
-    depth_bonus = min(0.10, turn_count * 0.02)  # Max +0.10
-    
-    # Calculate final confidence
-    overall = min(1.0, base_confidence + completeness_bonus + depth_bonus)
-    
+
+    base = (
+        intent_confidence * INTENT_WEIGHT +
+        extraction_confidence * EXTRACTION_WEIGHT
+    )
+
+    completeness_bonus = min(
+        MAX_COMPLETENESS_BONUS,
+        filled_slots * COMPLETENESS_BONUS_PER_SLOT
+    )
+
+    depth_bonus = min(
+        MAX_DEPTH_BONUS,
+        turn_count * DEPTH_BONUS_PER_TURN
+    )
+
+    overall = min(1.0, base + completeness_bonus + depth_bonus)
+
     breakdown = {
-        "intent_confidence": intent_confidence,
-        "extraction_confidence": extraction_confidence,
-        "base_confidence": base_confidence,
-        "completeness_bonus": completeness_bonus,
-        "depth_bonus": depth_bonus,
-        "overall_confidence": overall,
+        "intent_conf": round(intent_confidence, 3),
+        "extract_conf": round(extraction_confidence, 3),
+        "base": round(base, 3),
+        "completeness_bonus": round(completeness_bonus, 3),
+        "depth_bonus": round(depth_bonus, 3),
+        "overall": round(overall, 3),
+        "filled_slots": filled_slots,
+        "turns": turn_count,
     }
-    
+
     return overall, breakdown
 
 
+def _count_filled_slots(state: ConversationState) -> int:
+    return sum([
+        1 if getattr(state, "destination", None) else 0,
+        1 if getattr(state, "origin", None) else 0,
+        1 if getattr(state, "departure_date", None) else 0,
+        1 if getattr(state, "passengers", None) else 0,
+    ])
+
+
+def _normalize_extracted_params(params: Dict[str, Any]) -> Dict[str, Any]:
+    out = {}
+
+    for k, v in params.items():
+        if v is not None:
+            out[k] = v
+
+    dest = params.get("destination")
+    if isinstance(dest, str) and len(dest) == 3:
+        out["destination_airports"] = [dest.upper()]
+
+    origin = params.get("origin")
+    if isinstance(origin, str) and len(origin) == 3:
+        out["origin_airports"] = [origin.upper()]
+
+    if "return_date" in params:
+        out["is_round_trip"] = params["return_date"] is not None
+
+    return out
+
+
 # ============================================================================
-# MAIN NODE FUNCTION
+# MAIN NODE – SINGLE SOURCE OF TRUTH
 # ============================================================================
 
 async def should_use_llm_node(state: ConversationState) -> ConversationState:
-    """
-    Routing decision node - determines whether to use rule-based or LLM path.
+
+    message = getattr(state, "latest_user_message", "")
+
+    if not message:
+        logger.warning("[ShouldUseLLM] Empty message → defaulting to LLM path")
+        return update_state(state, {
+            "use_rule_based_path": False,
+            "routing_confidence": 0.0,
+            "confidence_breakdown": {"error": "empty_message"},
+        })
+
+    logger.info(f"[ShouldUseLLM] Processing: '{message[:80]}...'")
+
+    # ----------------------------------------
+    # 1. Intent Classification
+    # ----------------------------------------
+    try:
+        intent, intent_conf = intent_classifier.classify(message, state)
+    except Exception as e:
+        logger.error(f"Intent classifier failed: {e}")
+        intent, intent_conf = "unknown", 0.0
+
+    # ----------------------------------------
+    # 2. Rule-Based Extraction
+    # ----------------------------------------
+    try:
+        extracted, extract_conf = rule_extractor.extract(message, state)
+    except Exception as e:
+        logger.error(f"Extractor failed: {e}")
+        extracted, extract_conf = {}, 0.0
+
+    # ----------------------------------------
+    # 3. Confidence Calculation
+    # ----------------------------------------
+    filled_slots = _count_filled_slots(state)
+    turn_count = getattr(state, "turn_count", 0)
+
+    overall, breakdown = _calculate_overall_confidence(
+        intent_conf,
+        extract_conf,
+        filled_slots,
+        turn_count,
+    )
+
+    logger.info(
+        f"[ShouldUseLLM] Overall Confidence {overall:.3f} "
+        f"(slots={filled_slots}, turns={turn_count})"
+    )
+
+    # ----------------------------------------
+    # 4. Routing Decision
+    # ----------------------------------------
+    use_rule = overall >= CONFIDENCE_THRESHOLD
+
+    if use_rule:
+        logger.info(f"[ShouldUseLLM] ✅ HIGH confidence → RULE-BASED path")
+    else:
+        logger.info(f"[ShouldUseLLM] ⚠️ LOW confidence → LLM path")
+
+    # ----------------------------------------
+    # 5. Prepare State Updates
+    # ----------------------------------------
+    updates = {
+        "use_rule_based_path": use_rule,
+        "routing_confidence": overall,
+        "confidence_breakdown": breakdown,
+        "intent": intent,
+        "extracted_params": extracted,
+    }
+
+    # Apply extracted params immediately if using rule-based path
+    if use_rule:
+        normalized = _normalize_extracted_params(extracted)
+        updates.update(normalized)
+        logger.info(f"[ShouldUseLLM] Applied {len(normalized)} extracted params to state")
+
+    # 🔧 FIX: Always return updated state (was missing for LLM path)
+    updated_state = update_state(state, updates)
     
-    Decision flow:
-    1. Run local intent classifier
-    2. Run rule-based parameter extractor
-    3. Calculate overall confidence
-    4. If confidence >= 0.85 → use_rule_based_path = True
-    5. If confidence < 0.85 → use_rule_based_path = False
-    
-    The graph will use 'use_rule_based_path' flag to route.
-    
-    Returns:
-        Updated state with:
-        - use_rule_based_path: bool
-        - intent: str (if confident)
-        - extracted parameters (if confident)
-        - confidence_breakdown: dict (for debugging)
-    """
-    
-    message = state.get("latest_user_message", "")
-    
-    logger.info(f"[ShouldUseLLM] Evaluating: '{message[:50]}...'")
-    
-    # ========================================
-    # STEP 1: Run Rule-Based Intent Classifier
-    # ========================================
-    
-    intent, intent_confidence = intent_classifier.classify(message, state)
-    
-    logger.info(f"[ShouldUseLLM] Intent: {intent} (confidence: {intent_confidence:.2f})")
-    
-    # ========================================
-    # STEP 2: Run Rule-Based Parameter Extractor
-    # ========================================
-    
-    extracted_params, extraction_confidence = rule_extractor.extract(message, state)
-    
-    logger.info(f"[ShouldUseLLM] Extracted: {list(extracted_params.keys())} (confidence: {extraction_confidence:.2f})")
-    
-    # ========================================
-    # STEP 3: Calculate Overall Confidence
-    # ========================================
-    
-    overall_confidence, breakdown = _calculate_overall_confidence(
-        intent_confidence,
-        extraction_confidence,
-        state
+    # Debug: Verify state was updated correctly
+    logger.debug(
+        f"[ShouldUseLLM] State after update: use_rule={getattr(updated_state, 'use_rule_based_path', 'NOT SET')}, "
+        f"conf={getattr(updated_state, 'routing_confidence', 'NOT SET')}"
     )
     
-    logger.info(f"[ShouldUseLLM] Overall confidence: {overall_confidence:.2f}")
+    return updated_state
+
+
+# ============================================================================
+# ROUTER – READS THE DECISION
+# ============================================================================
+
+def route_based_on_confidence(state: ConversationState) -> Literal["rule_based_path", "llm_path"]:
+    """
+    Router function that reads the decision made by should_use_llm_node.
+    This is called by LangGraph's conditional edge.
+    """
+    # DEBUG: Log everything to see what we're receiving
+    logger.error(f"[ROUTER DEBUG] State type: {type(state)}")
+    logger.error(f"[ROUTER DEBUG] State is dict? {isinstance(state, dict)}")
+    logger.error(f"[ROUTER DEBUG] Has 'use_rule_based_path' attr? {hasattr(state, 'use_rule_based_path')}")
     
-    # ========================================
-    # STEP 4: Make Routing Decision
-    # ========================================
-    
-    CONFIDENCE_THRESHOLD = 0.85
-    use_rule_based = overall_confidence >= CONFIDENCE_THRESHOLD
-    
-    if use_rule_based:
-        logger.info("✅ [ShouldUseLLM] HIGH confidence → RULE-BASED path (no LLM)")
+    # Try both dict and attribute access
+    if isinstance(state, dict):
+        use_rule = state.get("use_rule_based_path", False)
+        conf = state.get("routing_confidence", 0.0)
+        logger.error(f"[ROUTER DEBUG] Dict access: use_rule={use_rule}, conf={conf}")
     else:
-        logger.info("⚠️ [ShouldUseLLM] LOW confidence → LLM path (fallback)")
+        use_rule = getattr(state, "use_rule_based_path", False)
+        conf = getattr(state, "routing_confidence", 0.0)
+        logger.error(f"[ROUTER DEBUG] Attr access: use_rule={use_rule}, conf={conf}")
     
-    # ========================================
-    # STEP 5: Update State
-    # ========================================
+    # Try to print ALL available keys/attributes
+    if isinstance(state, dict):
+        logger.error(f"[ROUTER DEBUG] Available keys: {list(state.keys())[:10]}")
+    else:
+        logger.error(f"[ROUTER DEBUG] Dir of state: {[x for x in dir(state) if not x.startswith('_')][:10]}")
     
-    updates = {
-        "use_rule_based_path": use_rule_based,
-        "confidence_breakdown": breakdown,
+    routing_path = "rule_based_path" if use_rule else "llm_path"
+
+    logger.info(
+        f"[Route] → {routing_path.upper()} "
+        f"(use_rule={use_rule}, confidence={conf:.3f})"
+    )
+
+    return routing_path
+
+
+# ============================================================================
+# DEBUGGING / METRICS
+# ============================================================================
+
+def get_routing_metrics(state: ConversationState) -> Dict[str, Any]:
+    return {
+        "routing_confidence": getattr(state, "routing_confidence", None),
+        "use_rule_based_path": getattr(state, "use_rule_based_path", None),
+        "confidence_breakdown": getattr(state, "confidence_breakdown", None),
+        "intent": getattr(state, "intent", None),
+        "extracted_params": getattr(state, "extracted_params", None),
+        "threshold": CONFIDENCE_THRESHOLD,
     }
-    
-    # If confident, apply intent and extracted parameters immediately
-    if use_rule_based:
-        updates["intent"] = intent
-        
-        # Merge extracted parameters into state
-        for key, value in extracted_params.items():
-            if value is not None:
-                updates[key] = value
-        
-        # Update derived fields
-        if "destination" in extracted_params:
-            dest = extracted_params["destination"]
-            if dest and len(dest) == 3:
-                updates["destination_airports"] = [dest.upper()]
-        
-        if "origin" in extracted_params:
-            orig = extracted_params["origin"]
-            if orig and len(orig) == 3:
-                updates["origin_airports"] = [orig.upper()]
-        
-        if "return_date" in extracted_params:
-            updates["is_round_trip"] = extracted_params["return_date"] is not None
-    
-    logger.info(f"[ShouldUseLLM] State updates: {list(updates.keys())}")
-    
-    return update_state(state, updates)
 
 
-# ============================================================================
-# GRAPH ROUTING HELPER (used in graph.py)
-# ============================================================================
-
-def route_based_on_confidence(
-    state: ConversationState
-) -> Literal["rule_based_path", "llm_path"]:
-    """
-    Routing function for LangGraph conditional edge.
-    
-    Called by graph.py to determine which path to take.
-    
-    Returns:
-        "rule_based_path" if use_rule_based_path is True
-        "llm_path" otherwise
-    """
-    use_rule_based = state.get("use_rule_based_path", False)
-    
-    if use_rule_based:
-        logger.info("→ Routing to RULE-BASED path")
-        return "rule_based_path"
-    else:
-        logger.info("→ Routing to LLM path")
-        return "llm_path"
+def validate_routing_state(state: ConversationState) -> bool:
+    try:
+        assert isinstance(getattr(state, "use_rule_based_path"), bool)
+        conf = getattr(state, "routing_confidence")
+        assert isinstance(conf, (int, float)) and 0 <= conf <= 1
+        assert getattr(state, "intent") is not None
+        return True
+    except Exception as e:
+        logger.error(f"Routing validation failed: {e}")
+        return False

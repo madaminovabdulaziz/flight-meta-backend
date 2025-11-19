@@ -11,8 +11,9 @@ async def refusal_node(state: ConversationState) -> ConversationState:
     Politely refuse non-travel or chitchat intents and steer user back to trip planning.
     """
 
-    intent = state.get("intent", "irrelevant")
-    latest = state.get("latest_user_message", "")
+    # dataclass-safe access
+    intent = getattr(state, "intent", "irrelevant")
+    latest = getattr(state, "latest_user_message", "")
 
     logger.info(f"[RefusalNode] Handling non-travel intent '{intent}'")
 
@@ -26,12 +27,14 @@ async def refusal_node(state: ConversationState) -> ConversationState:
         )
         suggestions = ["Istanbul", "Dubai", "London", "Paris"]
         placeholder = "Where are you flying to?"
+
     elif missing == "departure_date":
         assistant_message = (
             "I'm focused on trip planning. When would you like to depart?"
         )
         suggestions = ["This month", "Next month", "Give exact dates"]
         placeholder = "When do you want to fly?"
+
     else:  # origin
         assistant_message = (
             "Let’s get back to your trip. Which city or airport are you flying from?"

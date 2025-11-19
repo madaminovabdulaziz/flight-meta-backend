@@ -1,270 +1,189 @@
-"""
-LangGraph State Object
-Central state definition for AI Trip Planner conversation flow
-"""
-
-from typing import TypedDict, Optional, List, Dict, Any
-from datetime import date, datetime
+from dataclasses import dataclass, field, asdict
+from typing import Optional, List, Dict, Any
+from datetime import datetime, date
 
 
-class ConversationState(TypedDict, total=False):
-    """
-    Central state object passed through all LangGraph nodes.
-    Tracks conversation progress, collected parameters, and memory context.
-    
-    Philosophy:
-    - Single source of truth for conversation state
-    - Persisted to Redis (short-term) + MySQL (long-term)
-    - Enriched with memory from Qdrant + UserPreference table
-    - Updated by each node, never replaced entirely
-    """
-    
+# ============================================================
+# Conversation State — LangGraph-Compatible Dataclass Version
+# ============================================================
+
+@dataclass
+class ConversationState:
     # ==========================================
     # SESSION IDENTIFICATION
     # ==========================================
-    
-    session_id: str  # UUID for this conversation
-    user_id: Optional[int]  # User ID if authenticated, None for anonymous
-    session_token: str  # JWT or session token
-    
+    session_id: str
+    user_id: Optional[int] = None
+    session_token: str = ""
+
     # ==========================================
     # CONVERSATION TRACKING
     # ==========================================
-    
-    latest_user_message: str  # Current user input
-    conversation_history: List[Dict[str, str]]  # [{"role": "user"|"assistant", "content": "..."}]
-    turn_count: int  # Number of exchanges
-    
+    latest_user_message: str = ""
+    conversation_history: List[Dict[str, str]] = field(default_factory=list)
+    turn_count: int = 0
+
     # ==========================================
     # INTENT & FLOW CONTROL
     # ==========================================
-    
-    intent: Optional[str]  # Current message intent (travel_query, destination_provided, etc.)
-    missing_parameter: Optional[str]  # Next slot to collect (destination, dates, origin, etc.)
-    last_question: Optional[str]  # Last question asked to user
-    flow_stage: str  # Current stage: collecting, searching, ranking, completed
-    
+    intent: Optional[str] = None
+    missing_parameter: Optional[str] = None
+    last_question: Optional[str] = None
+    flow_stage: str = "collecting"
+
     # ==========================================
     # FLIGHT SEARCH PARAMETERS (8 REQUIRED SLOTS)
     # ==========================================
-    
-    # Core parameters
-    destination: Optional[str]  # Airport code (IST) or city (Istanbul)
-    origin: Optional[str]  # Airport code (LGW) or city (London)
-    departure_date: Optional[date]  # Parsed departure date
-    return_date: Optional[date]  # Parsed return date (None for one-way)
-    
-    # Additional parameters
-    passengers: int  # Number of passengers (default: 1)
-    travel_class: Optional[str]  # Economy, Premium Economy, Business, First
-    budget: Optional[float]  # Maximum budget or None
-    flexibility: Optional[int]  # Days of flexibility (±N days)
-    
-    # Parsed metadata
-    destination_airports: List[str]  # Resolved airport codes for destination
-    origin_airports: List[str]  # Resolved airport codes for origin
-    is_round_trip: bool  # True if return_date provided
-    
+    destination: Optional[str] = None
+    origin: Optional[str] = None
+    departure_date: Optional[date] = None
+    return_date: Optional[date] = None
+    passengers: int = 1
+    travel_class: Optional[str] = None
+    budget: Optional[float] = None
+    flexibility: Optional[int] = None
+
     # ==========================================
-    # MEMORY & PERSONALIZATION (3-LAYER SYSTEM)
+    # PARSED METADATA
     # ==========================================
-    
-    # Layer 1: Short-term session memory (current conversation)
-    short_term_memory: Dict[str, Any]  # Temporary preferences, corrections
-    
-    # Layer 2: Structured long-term preferences (MySQL UserPreference)
-    long_term_preferences: Dict[str, Any]  # {
-    #     "preferred_airports": ["LGW", "STN"],
-    #     "preferred_airlines": ["TK", "QR"],
-    #     "budget_range": [200, 500],
-    #     "prefers_direct": True,
-    #     "hates_overnight_layovers": True,
-    #     "preferred_time_of_day": "morning",
-    # }
-    
-    # Layer 3: Semantic memory (Qdrant vectors)
-    semantic_memories: List[Dict[str, Any]]  # Retrieved memory objects from Qdrant
-    
+    destination_airports: List[str] = field(default_factory=list)
+    origin_airports: List[str] = field(default_factory=list)
+    is_round_trip: bool = False
+
+    # ==========================================
+    # MEMORY LAYERS
+    # ==========================================
+    short_term_memory: Dict[str, Any] = field(default_factory=dict)
+    long_term_preferences: Dict[str, Any] = field(default_factory=dict)
+    semantic_memories: List[Dict[str, Any]] = field(default_factory=list)
+
     # ==========================================
     # FLIGHT ENGINE & RANKING
     # ==========================================
-    
-    # Flight search results
-    raw_flights: List[Dict[str, Any]]  # Normalized flight data from APIs
-    ranked_flights: List[Dict[str, Any]]  # Top N flights after ranking
-    
-    # Engine metadata
-    search_executed: bool  # Has flight search been triggered?
-    search_timestamp: Optional[datetime]  # When search was executed
-    search_cache_key: Optional[str]  # For caching results
-    
-    # Ranking metadata
-    ranking_weights: Dict[str, float]  # Dynamic weights based on user preferences
-    ranking_explanation: Optional[str]  # Why these flights were chosen
-    
+    raw_flights: List[Dict[str, Any]] = field(default_factory=list)
+    ranked_flights: List[Dict[str, Any]] = field(default_factory=list)
+    search_executed: bool = False
+    search_timestamp: Optional[datetime] = None
+    search_cache_key: Optional[str] = None
+
+    ranking_weights: Dict[str, float] = field(default_factory=lambda: {
+        "price": 0.35,
+        "duration": 0.25,
+        "layover": 0.15,
+        "airline_quality": 0.10,
+        "airport_convenience": 0.10,
+        "personalization": 0.05,
+    })
+    ranking_explanation: Optional[str] = None
+
     # ==========================================
     # RESPONSE GENERATION
     # ==========================================
-    
-    # Output to frontend
-    next_placeholder: Optional[str]  # Placeholder text for input field
-    suggestions: List[str]  # Suggestion buttons for user
-    assistant_message: Optional[str]  # Text response from assistant
-    
-    # Completion tracking
-    is_complete: bool  # All slots collected?
-    ready_for_search: bool  # Ready to trigger flight engine?
-    
+    next_placeholder: Optional[str] = None
+    suggestions: List[str] = field(default_factory=list)
+    assistant_message: Optional[str] = None
+
+
+        # Add after your existing fields, maybe in a "ROUTING" section:
+    use_rule_based_path: bool = False
+    routing_confidence: float = 0.0
+    confidence_breakdown: Dict[str, Any] = field(default_factory=dict)
+    extracted_params: Dict[str, Any] = field(default_factory=dict)
+
+    # ==========================================
+    # COMPLETION
+    # ==========================================
+    is_complete: bool = False
+    ready_for_search: bool = False
+
     # ==========================================
     # ERROR HANDLING & DEBUGGING
     # ==========================================
-    
-    errors: List[str]  # Any errors encountered
-    warnings: List[str]  # Non-fatal warnings
-    debug_info: Dict[str, Any]  # Debug metadata
-    
+    errors: List[str] = field(default_factory=list)
+    warnings: List[str] = field(default_factory=list)
+    debug_info: Dict[str, Any] = field(default_factory=dict)
+
     # ==========================================
     # TIMESTAMPS
     # ==========================================
+    created_at: datetime = field(default_factory=datetime.utcnow)
+    updated_at: datetime = field(default_factory=datetime.utcnow)
+
+    # Used for DB + Redis serialization
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
     
-    created_at: datetime
-    updated_at: datetime
+
+    def get(self, key, default=None):
+        return getattr(self, key, default)
+
+    def __getitem__(self, key):
+        return getattr(self, key)
+    
+    def __setitem__(self, key, value):
+        setattr(self, key, value)
 
 
-# ==========================================
-# STATE INITIALIZATION HELPER
-# ==========================================
+
+# ============================================================
+# INITIAL STATE FACTORY
+# ============================================================
 
 def create_initial_state(
     session_id: str,
     user_id: Optional[int] = None,
-    latest_message: str = ""
+    latest_message: str = "",
 ) -> ConversationState:
     """
-    Create a fresh state object for a new conversation.
+    Create a brand-new state object for new session.
     """
-    now = datetime.utcnow()
-    
     return ConversationState(
-        # Session
         session_id=session_id,
         user_id=user_id,
-        session_token="",  # Will be set by auth layer
-        
-        # Conversation
         latest_user_message=latest_message,
-        conversation_history=[],
-        turn_count=0,
-        
-        # Flow control
-        intent=None,
-        missing_parameter=None,
-        last_question=None,
-        flow_stage="collecting",
-        
-        # Flight parameters (8 slots)
-        destination=None,
-        origin=None,
-        departure_date=None,
-        return_date=None,
-        passengers=1,
-        travel_class=None,
-        budget=None,
-        flexibility=None,
-        
-        # Parsed metadata
-        destination_airports=[],
-        origin_airports=[],
-        is_round_trip=False,
-        
-        # Memory (3 layers)
-        short_term_memory={},
-        long_term_preferences={},
-        semantic_memories=[],
-        
-        # Flight engine
-        raw_flights=[],
-        ranked_flights=[],
-        search_executed=False,
-        search_timestamp=None,
-        search_cache_key=None,
-        
-        # Ranking
-        ranking_weights={
-            "price": 0.35,
-            "duration": 0.25,
-            "layover": 0.15,
-            "airline_quality": 0.10,
-            "airport_convenience": 0.10,
-            "personalization": 0.05,
-        },
-        ranking_explanation=None,
-        
-        # Response
-        next_placeholder=None,
-        suggestions=[],
-        assistant_message=None,
-        
-        # Completion
-        is_complete=False,
-        ready_for_search=False,
-        
-        # Error tracking
-        errors=[],
-        warnings=[],
-        debug_info={},
-        
-        # Timestamps
-        created_at=now,
-        updated_at=now,
     )
 
 
-# ==========================================
+# ============================================================
 # STATE UPDATE HELPER
-# ==========================================
+# ============================================================
 
 def update_state(state: ConversationState, updates: Dict[str, Any]) -> ConversationState:
     """
-    Safely update state with new values.
-    Always updates the 'updated_at' timestamp.
+    Safely update state — LangGraph works perfectly with dataclass mutation.
     """
-    state.update(updates)
-    state["updated_at"] = datetime.utcnow()
+    for key, value in updates.items():
+        setattr(state, key, value)
+
+    state.updated_at = datetime.utcnow()
     return state
 
 
-# ==========================================
-# STATE VALIDATION
-# ==========================================
+# ============================================================
+# VALIDATION HELPERS
+# ============================================================
 
 def validate_required_slots(state: ConversationState) -> Optional[str]:
-    """
-    Check if all required slots are filled.
-    Returns the name of the first missing required slot, or None if all filled.
-    """
-    required_slots = [
-        ("destination", state.get("destination")),
-        ("departure_date", state.get("departure_date")),
-        ("origin", state.get("origin")),
+    required = [
+        ("destination", state.destination),
+        ("departure_date", state.departure_date),
+        ("origin", state.origin),
     ]
-    
-    for slot_name, slot_value in required_slots:
-        if not slot_value:
-            return slot_name
-    
-    # All required slots filled
+
+    for name, value in required:
+        if not value:
+            return name
+
     return None
 
 
 def is_ready_for_search(state: ConversationState) -> bool:
-    """
-    Determine if we have enough information to trigger flight search.
-    """
     return (
-        state.get("destination") is not None
-        and state.get("origin") is not None
-        and state.get("departure_date") is not None
-        and len(state.get("destination_airports", [])) > 0
-        and len(state.get("origin_airports", [])) > 0
+        state.destination is not None
+        and state.origin is not None
+        and state.departure_date is not None
+        and len(state.destination_airports) > 0
+        and len(state.origin_airports) > 0
     )
+
+

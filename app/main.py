@@ -82,7 +82,7 @@ app.include_router(auth.router, prefix=f"{settings.API_V1_STR}/auth", tags=["aut
 app.include_router(nearest_airport.router, prefix=f"{settings.API_V1_STR}/nearest-airport", tags=["nearest airport"])
 app.include_router(airports.router, prefix=f"{settings.API_V1_STR}/airports", tags=["airports"])
 app.include_router(duffel_new.router, prefix=f"{settings.API_V1_STR}/duffel-search", tags=["Duffel Flights"])
-app.include_router(duffel_ai.router)
+#app.include_router(duffel_ai.router)
 app.include_router(duffel_flexible.router)
 app.include_router(chat.router)
 app.include_router(email_collection.router, prefix=f"{settings.API_V1_STR}/email-post", tags=["post email"])

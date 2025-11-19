@@ -1,82 +1,179 @@
-# langgraph_flow/nodes/ask_next_question_node.py
-
 import logging
+from typing import Dict, Any, List, Optional
+
 from app.langgraph_flow.state import ConversationState, update_state
-from services.llm_service import generate_json_response
 
 logger = logging.getLogger(__name__)
 
+SYSTEM_PROMPT = """Generate a short, friendly question to get missing travel information.
 
-async def ask_next_question_node(state: ConversationState) -> ConversationState:
-    """
-    Generate the next question to ask the user, based on the missing_parameter and context.
-    Uses Gemini to produce:
-      - next_placeholder
-      - suggestions (buttons)
-      - assistant_message
-    """
+The question should be:
+- Clear and specific
+- Natural and conversational
+- Professional but warm
 
-    missing = state.get("missing_parameter")
-    if not missing:
-        logger.warning("[AskNextQuestionNode] No missing_parameter set; falling back to generic question")
-        missing = "destination"
-
-    system_prompt = """
-You are a premium AI travel assistant.
-
-Your job:
-- Ask ONE clear, friendly follow-up question to get the missing information.
-- Adapt the question to the missing slot:
-  - destination        → where they are flying to
-  - origin             → where they are flying from
-  - departure_date     → when they want to depart
-  - return_date        → when they want to return
-  - passengers         → how many people are flying
-  - travel_class       → Economy / Premium Economy / Business / First
-  - budget             → max budget for the trip
-  - flexibility        → how flexible they are in days (±N)
-
-You must return STRICT JSON with:
+Return JSON:
 {
-  "next_placeholder": "short placeholder text for the input box",
-  "suggestions": ["short button 1", "short button 2", "..."],
-  "assistant_message": "natural language message displayed in chat"
+  "assistant_message": "the question to ask",
+  "next_placeholder": "short input placeholder",
+  "suggestions": ["option1", "option2", "option3"]
 }
 
-Rules:
-- assistant_message should be short, friendly, and expert-level.
-- suggestions should be 2–5 items, tailored to the missing parameter when possible.
-- Do NOT ask about anything other than the missing parameter.
-"""
+Keep everything concise."""
 
-    user_context = f"""
-Missing parameter: {missing}
 
-Current known data:
-- origin: {state.get("origin")}
-- destination: {state.get("destination")}
-- departure_date: {state.get("departure_date")}
-- return_date: {state.get("return_date")}
-- passengers: {state.get("passengers")}
-- travel_class: {state.get("travel_class")}
-- budget: {state.get("budget")}
-- flexibility: {state.get("flexibility")}
+FALLBACK_QUESTIONS = {
+    "destination": {
+        "assistant_message": "Where would you like to fly to?",
+        "next_placeholder": "Enter destination",
+        "suggestions": ["Dubai", "Istanbul", "London", "Paris"],
+    },
+    "origin": {
+        "assistant_message": "Where are you flying from?",
+        "next_placeholder": "Enter departure city",
+        "suggestions": ["Tashkent", "Samarkand", "Bukhara"],
+    },
+    "departure_date": {
+        "assistant_message": "When would you like to depart?",
+        "next_placeholder": "Select or enter date",
+        "suggestions": ["Tomorrow", "This Weekend", "Next Week"],
+    },
+    "return_date": {
+        "assistant_message": "When would you like to return?",
+        "next_placeholder": "Select return date",
+        "suggestions": ["Same Day", "Next Day", "One Week Later"],
+    },
+}
 
-Long-term preferences (may help tone/suggestions):
-{state.get("long_term_preferences", {})}
-"""
+# ============================================================
+# CONTEXT BUILDER — DATACLASS SAFE
+# ============================================================
 
-    resp = await generate_json_response(system_prompt, user_context)
+def _build_minimal_context(missing_parameter: str, state: ConversationState) -> str:
+    context_parts = [f"Ask about: {missing_parameter}"]
 
-    next_placeholder = resp.get("next_placeholder") or "Type your answer..."
-    suggestions = resp.get("suggestions") or []
-    assistant_message = resp.get("assistant_message") or "Could you share this detail with me?"
+    if missing_parameter == "origin" and state.destination:
+        context_parts.append(f"Destination: {state.destination}")
 
-    logger.info(f"[AskNextQuestionNode] Asking about '{missing}'")
+    elif missing_parameter == "departure_date":
+        if state.destination:
+            context_parts.append(f"Going to: {state.destination}")
+        if state.origin:
+            context_parts.append(f"From: {state.origin}")
+
+    elif missing_parameter == "return_date" and state.departure_date:
+        context_parts.append(f"Departing: {state.departure_date}")
+
+    return "\n".join(context_parts)
+
+
+def _get_fallback_question(missing_parameter: str) -> Dict[str, Any]:
+    return FALLBACK_QUESTIONS.get(
+        missing_parameter,
+        {
+            "assistant_message": f"Could you provide your {missing_parameter}?",
+            "next_placeholder": f"Enter {missing_parameter}",
+            "suggestions": [],
+        }
+    )
+
+# ============================================================
+# MAIN NODE — DATACLASS SAFE
+# ============================================================
+
+async def ask_next_question_node(state: ConversationState) -> ConversationState:
+
+    # Access safely (field does not exist in dataclass)
+    use_rule_based_path = getattr(state, "use_rule_based_path", False)
+
+    if use_rule_based_path:
+        logger.info("[AskQuestion] Rule-based path → skipping LLM question generation")
+        return state
+
+    missing = state.missing_parameter
+
+    if not missing:
+        logger.warning("[AskQuestion] missing_parameter not set, defaulting to 'destination'")
+        missing = "destination"
+
+    logger.info(f"[AskQuestion] Generating question for missing: '{missing}'")
+
+    # TRY LLM
+    try:
+        from services.llm_service import generate_json_response
+
+        context = _build_minimal_context(missing, state)
+        logger.debug(f"[AskQuestion] Context: {context}")
+
+        response = await generate_json_response(
+            system_prompt=SYSTEM_PROMPT,
+            user_prompt=context,
+        )
+
+        assistant_message = response.get("assistant_message")
+        next_placeholder = response.get("next_placeholder")
+        suggestions = response.get("suggestions", [])
+
+        if not assistant_message or not isinstance(assistant_message, str):
+            raise ValueError("Invalid assistant_message from LLM")
+
+        logger.info(f"[AskQuestion] ✅ Generated: '{assistant_message[:50]}...'")
+
+    except Exception as e:
+        logger.warning(f"[AskQuestion] LLM failed: {e} → using fallback template")
+        fallback = _get_fallback_question(missing)
+        assistant_message = fallback["assistant_message"]
+        next_placeholder = fallback["next_placeholder"]
+        suggestions = fallback["suggestions"]
+
+    # SANITIZE OUTPUT
+    if not next_placeholder or len(next_placeholder) > 100:
+        next_placeholder = f"Enter {missing}"
+
+    if not isinstance(suggestions, list):
+        suggestions = []
+
+    suggestions = suggestions[:5]
+
+    logger.info(
+        f"[AskQuestion] Question ready: message={len(assistant_message)} chars, suggestions={len(suggestions)}"
+    )
 
     return update_state(state, {
+        "assistant_message": assistant_message,
         "next_placeholder": next_placeholder,
         "suggestions": suggestions,
-        "assistant_message": assistant_message,
         "last_question": assistant_message,
     })
+
+# ============================================================
+# UTILITIES — DATACLASS SAFE
+# ============================================================
+
+def should_skip_llm_question(state: ConversationState) -> bool:
+    return getattr(state, "use_rule_based_path", False) or not state.missing_parameter
+
+
+def generate_question_from_template(missing_parameter: str, state: Optional[ConversationState] = None) -> Dict[str, Any]:
+    base = _get_fallback_question(missing_parameter)
+
+    if state:
+        if missing_parameter == "destination" and state.origin:
+            base["assistant_message"] = f"Where would you like to fly from {state.origin}?"
+
+        if missing_parameter == "departure_date" and state.origin and state.destination:
+            base["assistant_message"] = (
+                f"When would you like to fly from {state.origin} to {state.destination}?"
+            )
+
+    return base
+
+
+def get_question_metrics(state: ConversationState) -> Dict[str, Any]:
+    return {
+        "missing_parameter": state.missing_parameter,
+        "has_question": bool(state.assistant_message),
+        "has_suggestions": bool(state.suggestions),
+        "suggestion_count": len(state.suggestions),
+        "used_llm": not getattr(state, "use_rule_based_path", False),
+    }

@@ -30,26 +30,26 @@ async def finalize_response_node(state: ConversationState) -> ConversationState:
     """
     Prepare final assistant_message, suggestions, and save state to Redis.
     If ranked_flights is non-empty, we present top options.
-    Otherwise, we rely on previous question / error.
     """
 
-    ranked = state.get("ranked_flights") or []
-    assistant_message = state.get("assistant_message")
-    suggestions = state.get("suggestions") or []
+    ranked = getattr(state, "ranked_flights", []) or []
+    assistant_message = getattr(state, "assistant_message", None)
+    suggestions = getattr(state, "suggestions", []) or []
 
+    # =====================================================
+    # CASE 1 — We have flight results
+    # =====================================================
     if ranked:
-        # Build a simple, expert-style summary
         lines = ["Here are the top flight options I found for you:\n"]
 
         for i, f in enumerate(ranked[:3], start=1):
-            brief = _format_flight_brief(f)
-            lines.append(f"{i}. {brief}")
+            lines.append(f"{i}. {_format_flight_brief(f)}")
 
         lines.append(
-            "\nThese are selected based on a balance of price, duration, layovers, airline quality, "
+            "\nThese were selected based on price, duration, layovers, airline quality, "
             "airport convenience, and your preferences."
         )
-        lines.append("You can ask to adjust dates, origin, budget, or see more options.")
+        lines.append("You can ask to adjust dates, origin, or see more options.")
 
         assistant_message = "\n".join(lines)
         suggestions = [
@@ -58,28 +58,35 @@ async def finalize_response_node(state: ConversationState) -> ConversationState:
             "Change origin",
             "Filter by airline",
         ]
-
         is_complete = True
+
+    # =====================================================
+    # CASE 2 — No flights found or user isn't ready for search
+    # =====================================================
     else:
-        # No results or error scenario
         if not assistant_message:
             assistant_message = (
                 "I couldn't find suitable flights with the current parameters. "
-                "You can try adjusting your dates, origin, or budget."
+                "Try adjusting dates, origin, or budget."
             )
-            suggestions = [
-                "Change dates",
-                "Change budget",
-                "Change origin",
-            ]
+            suggestions = ["Change dates", "Change budget", "Change origin"]
+
         is_complete = False
 
-    # Persist state (short-term) to Redis
+    # =====================================================
+    # SAVE TO REDIS
+    # =====================================================
     try:
-        await save_session_state_to_redis(state["session_id"], dict(state))
+        await save_session_state_to_redis(
+            state.session_id,
+            state.to_dict()   # <— correct serialization for dataclass
+        )
     except Exception as e:
         logger.error(f"[FinalizeResponseNode] Failed to save session state: {e}", exc_info=True)
 
+    # =====================================================
+    # UPDATE STATE
+    # =====================================================
     return update_state(state, {
         "assistant_message": assistant_message,
         "suggestions": suggestions,

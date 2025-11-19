@@ -1,12 +1,6 @@
 """
 Production Flight Search Node
 Integrates with the enhanced FlightService to retrieve complete flight data.
-
-Updates from original:
-- Uses proper date objects instead of strings
-- Passes origin/destination as proper airport codes
-- Returns enriched flight data with all ranking fields
-- Better error handling and logging
 """
 
 import logging
@@ -24,37 +18,36 @@ async def flight_search_node(state: ConversationState) -> ConversationState:
     Populates raw_flights in the state with complete, ranking-ready data.
     """
     
-    if not state.get("ready_for_search"):
+    if not getattr(state, "ready_for_search", False):
         logger.warning("[FlightSearchNode] Called when ready_for_search=False")
         return state
     
-    # Extract search parameters
-    origin = state.get("origin")
-    destination = state.get("destination")
-    departure_date = state.get("departure_date")
-    return_date = state.get("return_date")
-    passengers = state.get("passengers", 1)
-    travel_class = state.get("travel_class")
-    budget = state.get("budget")
-    flexibility = state.get("flexibility", 0)
+    # Extract search parameters (dataclass-safe)
+    origin = getattr(state, "origin", None)
+    destination = getattr(state, "destination", None)
+    departure_date = getattr(state, "departure_date", None)
+    return_date = getattr(state, "return_date", None)
+    passengers = getattr(state, "passengers", 1)
+    travel_class = getattr(state, "travel_class", None)
+    budget = getattr(state, "budget", None)
+    flexibility = getattr(state, "flexibility", 0)
     
     logger.info(
         f"[FlightSearchNode] Searching flights {origin} → {destination} on {departure_date} "
         f"(return: {return_date}, pax={passengers}, class={travel_class}, budget={budget}, flex={flexibility})"
     )
     
-    # Import here to avoid circular dependencies
+    # Import FlightService
     try:
         from services.flight_service import FlightService
     except ImportError:
-        # Fallback to old mock service if production version not available
-        logger.warning("[FlightSearchNode] Production flight service not found, using basic mock")
+        logger.warning("[FlightSearchNode] Production flight service not found, using mock service")
         from services.flight_service import FlightService
     
     service = FlightService()
     
     try:
-        # Call flight search with proper parameters
+        # Call flight search service
         flights: List[Dict[str, Any]] = await service.search_flights(
             origin=origin,
             destination=destination,
@@ -68,7 +61,7 @@ async def flight_search_node(state: ConversationState) -> ConversationState:
         
         logger.info(f"[FlightSearchNode] Retrieved {len(flights)} flights with complete metadata")
         
-        # Log sample of first flight for debugging
+        # Log a sample flight
         if flights:
             sample = flights[0]
             logger.debug(
@@ -83,13 +76,14 @@ async def flight_search_node(state: ConversationState) -> ConversationState:
             "raw_flights": flights,
             "search_executed": True,
             "search_timestamp": datetime.utcnow(),
-            "errors": state.get("errors", []),
+            "errors": getattr(state, "errors", []) or [],
         })
     
     except Exception as e:
         logger.error(f"[FlightSearchNode] Flight search failed: {e}", exc_info=True)
         
-        errors = state.get("errors", [])
+        # Safely accumulate errors
+        errors = getattr(state, "errors", []) or []
         errors.append(f"Flight search failed: {str(e)}")
         
         return update_state(state, {
