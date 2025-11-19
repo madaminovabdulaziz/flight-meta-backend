@@ -2,6 +2,11 @@
 Rule-Based Ranking Node - Final Production Version
 ==================================================
 Rank flights using cheap_ranker with zero LLM calls.
+
+ENHANCEMENTS:
+- Fixed field name validation (duration_minutes vs duration)
+- Better error handling and validation
+- Comprehensive logging
 """
 
 import logging
@@ -17,7 +22,11 @@ logger = logging.getLogger(__name__)
 # CONFIGURATION
 # ==========================================
 
-REQUIRED_FLIGHT_FIELDS = ["price", "duration", "airline"]
+# Required fields for flight validation
+# Note: Using "duration_minutes" to match FlightService output format
+REQUIRED_FLIGHT_FIELDS = ["price", "airline"]
+OPTIONAL_FLIGHT_FIELDS = ["duration_minutes", "duration"]  # Accept either format
+
 MAX_FLIGHTS_TO_RANK = 50
 
 
@@ -26,35 +35,91 @@ MAX_FLIGHTS_TO_RANK = 50
 # ==========================================
 
 def _validate_flight(flight: Any) -> bool:
+    """
+    Validate that a flight dict has the minimum required fields.
+
+    Accepts both "duration" and "duration_minutes" for flexibility.
+    """
     if not isinstance(flight, dict):
+        logger.debug(f"[RuleRanking] Flight validation failed: not a dict (type={type(flight)})")
         return False
 
+    # Check required fields
     for field in REQUIRED_FLIGHT_FIELDS:
         if field not in flight:
+            logger.debug(f"[RuleRanking] Flight validation failed: missing '{field}'")
             return False
 
         if field == "price" and not isinstance(flight[field], (int, float)):
+            logger.debug(f"[RuleRanking] Flight validation failed: price is not numeric")
             return False
 
-        if field == "duration" and not isinstance(flight[field], (int, float)):
+    # Check that at least one duration field exists
+    has_duration = any(field in flight for field in OPTIONAL_FLIGHT_FIELDS)
+    if not has_duration:
+        logger.debug(f"[RuleRanking] Flight validation failed: no duration field found")
+        return False
+
+    # Validate duration if present
+    if "duration_minutes" in flight:
+        if not isinstance(flight["duration_minutes"], (int, float)):
+            logger.debug(f"[RuleRanking] Flight validation failed: duration_minutes is not numeric")
+            return False
+    elif "duration" in flight:
+        if not isinstance(flight["duration"], (int, float)):
+            logger.debug(f"[RuleRanking] Flight validation failed: duration is not numeric")
             return False
 
     return True
 
 
+def _normalize_flight(flight: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Normalize flight data to standard format.
+
+    Handles field name variations (e.g., duration_minutes → duration).
+    """
+    normalized = flight.copy()
+
+    # Normalize duration field
+    if "duration_minutes" in normalized and "duration" not in normalized:
+        normalized["duration"] = normalized["duration_minutes"]
+    elif "duration" not in normalized and "duration_minutes" in normalized:
+        pass  # Already has duration_minutes, keep it
+
+    return normalized
+
+
 def _sanitize_flights(raw_flights: List[Any]) -> List[Dict[str, Any]]:
+    """
+    Validate and normalize flight list.
+
+    Returns:
+        List of valid, normalized flight dicts
+    """
     if not isinstance(raw_flights, list):
         logger.error(f"[RuleRanking] raw_flights is not a list: {type(raw_flights)}")
         return []
 
     valid = []
+    invalid_count = 0
+
     for i, flight in enumerate(raw_flights):
         if _validate_flight(flight):
-            valid.append(flight)
+            normalized = _normalize_flight(flight)
+            valid.append(normalized)
         else:
-            logger.warning(f"[RuleRanking] Skipping invalid flight at index {i}: {type(flight)}")
+            invalid_count += 1
+            if invalid_count <= 3:  # Log first 3 failures for debugging
+                logger.warning(
+                    f"[RuleRanking] Skipping invalid flight at index {i}: "
+                    f"type={type(flight)}, keys={list(flight.keys()) if isinstance(flight, dict) else 'N/A'}"
+                )
 
-    logger.info(f"[RuleRanking] Validated {len(valid)}/{len(raw_flights)} flights")
+    if invalid_count > 0:
+        logger.info(f"[RuleRanking] Validated {len(valid)}/{len(raw_flights)} flights ({invalid_count} invalid)")
+    else:
+        logger.info(f"[RuleRanking] Validated {len(valid)}/{len(raw_flights)} flights (all valid)")
 
     if len(valid) > MAX_FLIGHTS_TO_RANK:
         logger.info(f"[RuleRanking] Limiting to {MAX_FLIGHTS_TO_RANK} flights (had {len(valid)})")
@@ -64,6 +129,7 @@ def _sanitize_flights(raw_flights: List[Any]) -> List[Dict[str, Any]]:
 
 
 def _generate_ranking_explanation(ranking_result: Dict[str, Any], flight_count: int) -> str:
+    """Generate a human-readable explanation of the ranking."""
     if "summary_text" in ranking_result:
         return ranking_result["summary_text"]
 
@@ -81,6 +147,7 @@ def _generate_ranking_explanation(ranking_result: Dict[str, Any], flight_count: 
 # ==========================================
 
 def should_skip_rule_ranking(state: ConversationState) -> bool:
+    """Determine if rule-based ranking should be skipped."""
     if not getattr(state, "use_rule_based_path", False):
         return True
 
@@ -96,6 +163,12 @@ def should_skip_rule_ranking(state: ConversationState) -> bool:
 # ==========================================
 
 async def rule_based_ranking_node(state: ConversationState) -> ConversationState:
+    """
+    Rank flights using rule-based cheap_ranker (no LLM).
+
+    This node processes flight results and ranks them using a deterministic
+    algorithm based on price, duration, and other factors.
+    """
 
     # ───────────────────────────────────────────
     # Guard 1 — only on rule-based path
@@ -135,7 +208,7 @@ async def rule_based_ranking_node(state: ConversationState) -> ConversationState
                 "Found flights but they don't have valid pricing or details. "
                 "Please try adjusting your search criteria."
             ),
-            "smart_suggestions": [],
+            "smart_suggestions": ["Change dates", "Try different airports", "Adjust budget"],
             "ranking_method": "rule_based",
             "ranking_confidence": 0.0,
             "updated_at": datetime.now(timezone.utc),
@@ -154,9 +227,11 @@ async def rule_based_ranking_node(state: ConversationState) -> ConversationState
         logger.info(f"[RuleRanking] ✅ Ranked {len(ranked_flights)} flights")
     except Exception as e:
         logger.error(f"[RuleRanking] Ranking failed: {e}", exc_info=True)
+        # Fallback: simple price sort
         ranked_flights = sorted(valid_flights, key=lambda x: x.get("price", float("inf")))
         suggestions = []
         stats = {"total_flights": len(ranked_flights)}
+        logger.info(f"[RuleRanking] ⚠️ Fallback ranking applied ({len(ranked_flights)} flights)")
 
     # ───────────────────────────────────────────
     # Explanation — deterministic template
@@ -189,6 +264,7 @@ async def rule_based_ranking_node(state: ConversationState) -> ConversationState
 # ==========================================
 
 def get_ranking_metrics(state: ConversationState) -> Dict[str, Any]:
+    """Get ranking performance metrics."""
     ranked = getattr(state, "ranked_flights", []) or []
     return {
         "ranking_method": getattr(state, "ranking_method", None),

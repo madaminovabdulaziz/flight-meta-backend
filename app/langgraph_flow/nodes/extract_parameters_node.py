@@ -2,6 +2,7 @@
 Extract Parameters Node - Production-Ready LLM Fallback
 =======================================================
 LLM-based parameter extraction for low-confidence queries.
+Enhanced with full conversation context support for multi-turn dialogs.
 """
 
 import logging
@@ -28,7 +29,10 @@ PARAMETER_FIELDS = [
     "flexibility",
 ]
 
-SYSTEM_PROMPT = """Extract flight parameters from the user's message.
+SYSTEM_PROMPT = """Extract flight parameters from the conversation.
+
+You are analyzing a conversation history where the user is booking a flight.
+Extract any flight parameters mentioned in the conversation.
 
 Return JSON with these keys (use null if not present):
 {
@@ -42,7 +46,14 @@ Return JSON with these keys (use null if not present):
   "flexibility": int|null
 }
 
-Do not guess. Use null when unsure."""
+IMPORTANT:
+- Consider the FULL conversation context, not just the latest message
+- Pay attention to which parameter the assistant is asking for
+- Extract relative dates like "next week", "tomorrow", "next Monday" as specific dates
+- If the user says "To Paris", that's the destination
+- If the user says "From London", that's the origin
+- If the user says just a date/time, that's likely the departure_date
+- Do not guess. Use null when unsure."""
 
 
 # ==========================================
@@ -68,12 +79,53 @@ def _normalize_airport_code(code: Optional[str]) -> List[str]:
     return []
 
 
+def _build_conversation_context(state: ConversationState) -> str:
+    """
+    Build rich conversation context from history.
+
+    This is critical for multi-turn conversations where parameters
+    are provided incrementally across multiple messages.
+    """
+    history = getattr(state, "conversation_history", None)
+
+    if not history or len(history) == 0:
+        # Fallback to latest message
+        return getattr(state, "latest_user_message", "")
+
+    # Take last 6 messages (3 turns = 3 user + 3 assistant)
+    recent_history = history[-6:] if len(history) > 6 else history
+
+    # Build context string with role labels
+    context_parts = []
+    for msg in recent_history:
+        role = msg.get("role", "user")
+        content = msg.get("content", "")
+        if content:
+            context_parts.append(f"{role}: {content}")
+
+    context = "\n".join(context_parts)
+
+    logger.debug(f"[ExtractParams] Built context from {len(recent_history)} messages")
+
+    return context
+
+
 def _merge_extracted_params(
     state: ConversationState,
     extracted: Dict[str, Any],
     is_change_of_plan: bool = False
 ) -> Dict[str, Any]:
+    """
+    Merge extracted parameters with existing state.
 
+    Args:
+        state: Current conversation state
+        extracted: Newly extracted parameters
+        is_change_of_plan: If True, overwrite existing values
+
+    Returns:
+        Dictionary of updates to apply
+    """
     updates = {}
 
     for key, value in extracted.items():
@@ -94,6 +146,7 @@ def _merge_extracted_params(
 
 
 def _add_derived_fields(state: ConversationState, updates: Dict[str, Any]) -> Dict[str, Any]:
+    """Add derived fields like airport lists and is_round_trip."""
     destination = updates.get("destination", getattr(state, "destination", None))
     origin = updates.get("origin", getattr(state, "origin", None))
     return_date = updates.get("return_date", getattr(state, "return_date", None))
@@ -118,19 +171,27 @@ def _add_derived_fields(state: ConversationState, updates: Dict[str, Any]) -> Di
 # ==========================================
 
 async def extract_parameters_node(state: ConversationState) -> ConversationState:
+    """
+    Extract parameters using LLM with full conversation context.
+
+    This node is only called when the rule-based path has low confidence.
+    It uses the LLM to extract parameters from the conversation history,
+    providing much better multi-turn support than single-message extraction.
+    """
 
     # Guard rail: skip if rule-based path
     if getattr(state, "use_rule_based_path", False):
         logger.info("[ExtractParams] Rule-based path active → skipping LLM extraction")
         return state
 
-    latest_message = getattr(state, "latest_user_message", "")
+    # Build conversation context (with history!)
+    context = _build_conversation_context(state)
 
-    if not latest_message or not latest_message.strip():
-        logger.warning("[ExtractParams] Empty message, skipping extraction")
+    if not context or not context.strip():
+        logger.warning("[ExtractParams] Empty context, skipping extraction")
         return state
 
-    logger.info(f"[ExtractParams] Extracting from: '{latest_message[:80]}...'")
+    logger.info(f"[ExtractParams] Extracting from conversation context ({len(context)} chars)")
 
     # LLM extraction
     try:
@@ -138,7 +199,7 @@ async def extract_parameters_node(state: ConversationState) -> ConversationState
 
         response = await generate_json_response(
             system_prompt=SYSTEM_PROMPT,
-            user_prompt=latest_message,
+            user_prompt=context,  # Use full context, not just latest message
         )
 
         logger.debug(f"[ExtractParams] Raw LLM response: {response}")
@@ -205,6 +266,7 @@ async def extract_parameters_node(state: ConversationState) -> ConversationState
 # ==========================================
 
 async def test_extraction(message: str) -> Dict[str, Any]:
+    """Test extraction on a single message."""
     import time
     from services.llm_service import generate_json_response
 
@@ -235,6 +297,7 @@ async def test_extraction(message: str) -> Dict[str, Any]:
 
 
 def get_extraction_coverage(state: ConversationState) -> Dict[str, Any]:
+    """Get extraction coverage statistics."""
     filled = []
     missing = []
 
@@ -253,10 +316,12 @@ def get_extraction_coverage(state: ConversationState) -> Dict[str, Any]:
 
 
 def should_skip_llm_extraction(state: ConversationState) -> bool:
+    """Determine if LLM extraction should be skipped."""
     if getattr(state, "use_rule_based_path", False):
         return True
 
-    if not getattr(state, "latest_user_message", "").strip():
+    context = _build_conversation_context(state)
+    if not context.strip():
         return True
 
     critical = ["destination", "origin", "departure_date"]
