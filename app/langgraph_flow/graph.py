@@ -24,6 +24,7 @@ from app.langgraph_flow.nodes.refusal_node import refusal_node
 from app.langgraph_flow.nodes.flight_search_node import flight_search_node
 from app.langgraph_flow.nodes.ranking_node import ranking_node
 from app.langgraph_flow.nodes.finalize_response_node import finalize_response_node
+from app.langgraph_flow.nodes.learn_preferences_node import learn_preferences_node
 
 
 # Rule-based path nodes
@@ -133,6 +134,7 @@ def create_trip_planner_graph() -> StateGraph:
     # Rule-based path nodes
     graph.add_node("rule_question", rule_based_question_node)
     graph.add_node("rule_ranking", rule_based_ranking_node)
+    graph.add_node("learn_preferences", learn_preferences_node)
 
     # Shared nodes
     graph.add_node("determine_missing_slot", determine_missing_slot_node)
@@ -171,7 +173,8 @@ def create_trip_planner_graph() -> StateGraph:
         },
     )
 
-    graph.add_edge("extract_parameters", "determine_missing_slot")
+    graph.add_edge("extract_parameters", "learn_preferences")
+    graph.add_edge("learn_preferences", "determine_missing_slot")
     graph.add_edge("refusal", END)
 
     # Missing slot → ask / rule / search
