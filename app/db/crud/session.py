@@ -13,7 +13,7 @@ from enum import Enum
 from sqlalchemy import select, delete, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.models import AISession, SessionStatus # <--- IMPORT SINGLE SOURCE OF TRUTH
+from app.models.models import AISession, SessionStatus
 from app.langgraph_flow.state import ConversationState
 
 logger = logging.getLogger(__name__)
@@ -120,6 +120,10 @@ async def save_session_state(
 
         # Determine session status (Enum object)
         status_enum = _determine_session_status(state_dict)
+        
+        # 🛠️ CRITICAL FIX: Extract the string value ("active") explicitly.
+        # This prevents SQLAlchemy from sending "ACTIVE" (Enum Name) which crashes MySQL.
+        status_value = status_enum.value 
 
         # Check if session exists
         stmt = select(AISession).where(AISession.session_token == session_id)
@@ -133,12 +137,12 @@ async def save_session_state(
                 .where(AISession.session_token == session_id)
                 .values(
                     state_json=state_json,
-                    status=status_enum,
+                    status=status_value,  # <--- Use .value (string)
                     updated_at=datetime.utcnow(),
                 )
             )
             await db.execute(stmt)
-            logger.debug(f"[SessionCRUD] Updated session {session_id} (status: {status_enum.value})")
+            logger.debug(f"[SessionCRUD] Updated session {session_id} (status: {status_value})")
 
         else:
             # CREATE new session
@@ -148,12 +152,12 @@ async def save_session_state(
                 user_id=user_id if user_id and user_id > 0 else None,
                 session_token=session_id,
                 state_json=state_json,
-                status=status_enum,
+                status=status_value,  # <--- Use .value (string)
                 created_at=datetime.utcnow(),
                 updated_at=datetime.utcnow(),
             )
             db.add(new_session)
-            logger.debug(f"[SessionCRUD] Created session {session_id} (user_id: {user_id}, status: {status_enum.value})")
+            logger.debug(f"[SessionCRUD] Created session {session_id} (user_id: {user_id}, status: {status_value})")
 
         await db.commit()
         logger.info(f"[SessionCRUD] ✅ Successfully saved session {session_id}")
