@@ -18,23 +18,34 @@ target_metadata = Base.metadata
 
 
 def get_url():
-    # 1. Try fetching from Alembic config
-    url = config.get_main_option("sqlalchemy.url")
+    """
+    Get the DB URL.
+    PRIORITY 1: Environment Variable (Railway)
+    PRIORITY 2: App Settings
+    PRIORITY 3: Alembic Config (.ini)
+    """
+    # 1. Check Environment Variable FIRST (Critical for Railway)
+    url = os.environ.get("DATABASE_URL")
     
-    # 2. Fallback to env var (Check specific Railway vars too)
+    # 2. Fallback to Settings
     if not url:
-        url = os.environ.get("DATABASE_URL") or os.environ.get("MYSQL_URL")
+        try:
+            url = settings.DATABASE_URL
+        except:
+            pass
 
+    # 3. Fallback to Alembic Config (only if nothing else is found)
     if not url:
-        raise ValueError("❌ DATABASE_URL is not set in environment variables!")
+        url = config.get_main_option("sqlalchemy.url")
 
-    # 3. Ensure it is synchronous (pymysql)
-    # Railway often gives 'mysql://', we need 'mysql+pymysql://'
-    if url.startswith("mysql://"):
-        url = url.replace("mysql://", "mysql+pymysql://")
-    elif "mysql+aiomysql" in url:
-        url = url.replace("mysql+aiomysql", "mysql+pymysql")
-        
+    # 4. CRITICAL FIX: Force Sync Driver (pymysql) for Migrations
+    # Railway provides 'mysql+aiomysql', but Alembic needs 'mysql+pymysql'
+    if url:
+        if "mysql+aiomysql" in url:
+            url = url.replace("mysql+aiomysql", "mysql+pymysql")
+        elif url.startswith("mysql://"):
+            url = url.replace("mysql://", "mysql+pymysql://")
+            
     return url
 
 def run_migrations_offline() -> None:
