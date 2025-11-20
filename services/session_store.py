@@ -1,30 +1,29 @@
 """
-Redis Session Store - Fixed Serialization
-==========================================
-Handles session state caching with proper datetime serialization.
+Redis Session Store - Production Version
+========================================
+Handles session state caching with proper configuration loading.
 """
 
 import json
 import asyncio
+import logging
 from typing import Optional, Dict, Any
 from datetime import date, datetime
 from redis import asyncio as aioredis
 
-import logging
+# 1. Import settings to get the REAL Redis URL from env vars
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
-REDIS_URL = "redis://localhost:6379/0"
-
 # Global singleton client
 _redis_client: Optional[aioredis.Redis] = None
-_redis_lock: asyncio.Lock = asyncio.Lock()  # Thread-safety fix
+_redis_lock: asyncio.Lock = asyncio.Lock()
 
 
 class DateTimeEncoder(json.JSONEncoder):
     """
     Custom JSON encoder for datetime and date objects.
-    Handles nested datetime objects correctly.
     """
     def default(self, obj):
         if isinstance(obj, (datetime, date)):
@@ -37,20 +36,36 @@ class DateTimeEncoder(json.JSONEncoder):
 async def get_redis_client() -> aioredis.Redis:
     """
     Lazy init Redis client with thread-safety.
-    
-    FIXED: Now uses asyncio.Lock to prevent race conditions.
+    Uses the URL from settings (which loads from Railway env vars).
     """
     global _redis_client
     
     async with _redis_lock:
         if _redis_client is None:
-            _redis_client = aioredis.Redis.from_url(
-                REDIS_URL,
-                encoding="utf-8",
-                decode_responses=True,
-                max_connections=20,  # Connection pooling
-            )
-            logger.info("[Redis] Client initialized")
+            # 2. Use settings.REDIS_URL instead of hardcoded string
+            # Fallback to localhost only if settings fail (for local dev)
+            redis_url = getattr(settings, "REDIS_URL", None) or "redis://localhost:6379/0"
+            
+            logger.info(f"[Redis] Connecting to: {redis_url.split('@')[-1]}") # Log host only for safety
+            
+            try:
+                _redis_client = aioredis.Redis.from_url(
+                    redis_url,
+                    encoding="utf-8",
+                    decode_responses=True,
+                    max_connections=20,
+                    socket_connect_timeout=5,  # Fail fast if connection is bad
+                    socket_keepalive=True,
+                )
+                
+                # Test connection immediately
+                await _redis_client.ping()
+                logger.info("[Redis] ✅ Client initialized and connected")
+                
+            except Exception as e:
+                logger.error(f"[Redis] ❌ Connection failed: {e}")
+                _redis_client = None
+                raise
     
     return _redis_client
 
@@ -60,12 +75,7 @@ async def get_redis_client() -> aioredis.Redis:
 # -----------------------------------------
 
 async def get_session_state_from_redis(session_id: str) -> Optional[Dict[str, Any]]:
-    """
-    Retrieve stored session state JSON.
-    
-    Returns:
-        Dict with session state, or None if not found/invalid
-    """
+    """Retrieve stored session state JSON."""
     try:
         client = await get_redis_client()
         data = await client.get(f"session:{session_id}")
@@ -75,28 +85,20 @@ async def get_session_state_from_redis(session_id: str) -> Optional[Dict[str, An
 
         return json.loads(data)
         
-    except json.JSONDecodeError as e:
-        logger.warning(f"[Redis] Failed to deserialize session {session_id}: {e}")
-        return None
     except Exception as e:
-        logger.error(f"[Redis] Error retrieving session {session_id}: {e}", exc_info=True)
+        # Don't crash app if Redis is down, just log and return None (fallback to DB)
+        logger.warning(f"[Redis] Read failed for {session_id}: {e}")
         return None
 
 
 async def save_session_state_to_redis(
     session_id: str,
-    state: Any  # Can be dict or ConversationState
+    state: Any
 ) -> bool:
-    """
-    Store session state JSON with proper serialization of dates and datetimes.
-    
-    Returns:
-        True if save succeeded, False otherwise
-    """
+    """Store session state JSON."""
     try:
         client = await get_redis_client()
         
-        # Convert state to dict if it's a dataclass
         if hasattr(state, 'to_dict'):
             state_dict = state.to_dict()
         elif isinstance(state, dict):
@@ -105,22 +107,15 @@ async def save_session_state_to_redis(
             logger.error(f"[Redis] Invalid state type: {type(state)}")
             return False
         
-        # Serialize with custom encoder
         serialized_state = json.dumps(state_dict, cls=DateTimeEncoder)
         
-        # Save with 24-hour expiry (increased from 1 hour)
         await client.set(
             f"session:{session_id}",
             serialized_state,
             ex=86400  # 24 hours
         )
-        
-        logger.debug(f"[Redis] Saved session {session_id}")
         return True
         
     except Exception as e:
-        logger.error(
-            f"[Redis] Failed to save session {session_id}: {e}",
-            exc_info=True
-        )
+        logger.error(f"[Redis] Write failed for {session_id}: {e}")
         return False
