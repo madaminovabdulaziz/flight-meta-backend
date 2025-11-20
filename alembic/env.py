@@ -18,23 +18,24 @@ target_metadata = Base.metadata
 
 
 def get_url():
-    """
-    Get the DB URL and force it to be synchronous (pymysql) for migrations.
-    Migrations do not benefit from async and it causes deployment crashes.
-    """
     # 1. Try fetching from Alembic config
     url = config.get_main_option("sqlalchemy.url")
     
-    # 2. Fallback to env var or settings
+    # 2. Fallback to env var (Check specific Railway vars too)
     if not url:
-        url = os.environ.get("DATABASE_URL") or settings.DATABASE_URL
+        url = os.environ.get("DATABASE_URL") or os.environ.get("MYSQL_URL")
 
-    # 3. CRITICAL FIX: Swap 'mysql+aiomysql' -> 'mysql+pymysql'
-    if url and "mysql+aiomysql" in url:
+    if not url:
+        raise ValueError("❌ DATABASE_URL is not set in environment variables!")
+
+    # 3. Ensure it is synchronous (pymysql)
+    # Railway often gives 'mysql://', we need 'mysql+pymysql://'
+    if url.startswith("mysql://"):
+        url = url.replace("mysql://", "mysql+pymysql://")
+    elif "mysql+aiomysql" in url:
         url = url.replace("mysql+aiomysql", "mysql+pymysql")
         
     return url
-
 
 def run_migrations_offline() -> None:
     """Run migrations in 'offline' mode."""
