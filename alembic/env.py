@@ -1,9 +1,7 @@
 from logging.config import fileConfig
-from sqlalchemy import pool
-from sqlalchemy.engine import Connection
-from sqlalchemy.ext.asyncio import async_engine_from_config
+import os
+from sqlalchemy import create_engine, pool
 from alembic import context
-import asyncio
 
 from app.models.models import Base
 from app.core.config import settings
@@ -15,17 +13,32 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# IMPORTANT: Set the database URL from settings
-# This ensures aiomysql:// driver is used
-config.set_main_option('sqlalchemy.url', settings.get_database_url)
-
 # Add your model's MetaData for 'autogenerate' support
 target_metadata = Base.metadata
 
 
+def get_url():
+    """
+    Get the DB URL and force it to be synchronous (pymysql) for migrations.
+    Migrations do not benefit from async and it causes deployment crashes.
+    """
+    # 1. Try fetching from Alembic config
+    url = config.get_main_option("sqlalchemy.url")
+    
+    # 2. Fallback to env var or settings
+    if not url:
+        url = os.environ.get("DATABASE_URL") or settings.DATABASE_URL
+
+    # 3. CRITICAL FIX: Swap 'mysql+aiomysql' -> 'mysql+pymysql'
+    if url and "mysql+aiomysql" in url:
+        url = url.replace("mysql+aiomysql", "mysql+pymysql")
+        
+    return url
+
+
 def run_migrations_offline() -> None:
     """Run migrations in 'offline' mode."""
-    url = config.get_main_option("sqlalchemy.url")
+    url = get_url()
     context.configure(
         url=url,
         target_metadata=target_metadata,
@@ -37,34 +50,24 @@ def run_migrations_offline() -> None:
         context.run_migrations()
 
 
-def do_run_migrations(connection: Connection) -> None:
-    """Run migrations with a connection."""
-    context.configure(
-        connection=connection,
-        target_metadata=target_metadata
-    )
-
-    with context.begin_transaction():
-        context.run_migrations()
-
-
-async def run_async_migrations() -> None:
-    """Run migrations in async mode using aiomysql."""
-    connectable = async_engine_from_config(
-        config.get_section(config.config_ini_section, {}),
-        prefix="sqlalchemy.",
-        poolclass=pool.NullPool,
-    )
-
-    async with connectable.connect() as connection:
-        await connection.run_sync(do_run_migrations)
-
-    await connectable.dispose()
-
-
 def run_migrations_online() -> None:
-    """Run migrations in 'online' mode using async."""
-    asyncio.run(run_async_migrations())
+    """Run migrations in 'online' mode (Synchronous)."""
+    
+    # 1. Get the synchronous URL
+    url = get_url()
+    
+    # 2. Create a standard synchronous engine
+    connectable = create_engine(url, poolclass=pool.NullPool)
+
+    # 3. Run migrations synchronously
+    with connectable.connect() as connection:
+        context.configure(
+            connection=connection, 
+            target_metadata=target_metadata
+        )
+
+        with context.begin_transaction():
+            context.run_migrations()
 
 
 if context.is_offline_mode():
