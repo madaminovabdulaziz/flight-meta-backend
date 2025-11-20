@@ -30,4 +30,4 @@ EXPOSE 8000
 
 # Run migrations AND start server (Chained command using sh -c)
 # This ensures migrations run every time you deploy
-CMD sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"
+CMD uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}
