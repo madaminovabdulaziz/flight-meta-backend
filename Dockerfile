@@ -26,9 +26,8 @@ USER appuser
 
 EXPOSE 8000
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=120s --retries=3 \
-    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/')" || exit 1
+# --- HEALTHCHECK REMOVED ---
 
-# Run migrations then start server
-CMD uvicorn app.main:app --host 0.0.0.0 --port 8000
+# Run migrations AND start server (Chained command using sh -c)
+# This ensures migrations run every time you deploy
+CMD sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"
