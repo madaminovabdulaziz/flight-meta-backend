@@ -82,7 +82,7 @@ class Settings(BaseSettings):
     # REDIS (SESSION, CACHING, MEMORY TEMP STORE)
     # ============================================================
     REDIS_URI: str = "redis://localhost:6379/0"
-    REDIS_URL: Optional[str] = None  # alias
+    REDIS_URL: str = "redis://localhost:6379/0"
     REDIS_SESSION_TTL: int = 86400
     REDIS_FLIGHT_CACHE_TTL: int = 900
 

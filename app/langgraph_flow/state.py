@@ -1,10 +1,12 @@
 from dataclasses import dataclass, field, asdict
 from typing import Optional, List, Dict, Any
 from datetime import datetime, date
+import logging
 
+logger = logging.getLogger(__name__)
 
 # ============================================================
-# Conversation State — LangGraph-Compatible Dataclass Version
+# Conversation State – LangGraph-Compatible Dataclass Version
 # ============================================================
 
 @dataclass
@@ -27,6 +29,7 @@ class ConversationState:
     # INTENT & FLOW CONTROL
     # ==========================================
     intent: Optional[str] = None
+    llm_intent: Optional[str] = None  # Added for completeness if used in nodes
     missing_parameter: Optional[str] = None
     last_question: Optional[str] = None
     flow_stage: str = "collecting"
@@ -75,6 +78,12 @@ class ConversationState:
         "personalization": 0.05,
     })
     ranking_explanation: Optional[str] = None
+    
+    # ✅ NEW FIELDS ADDED HERE
+    smart_suggestions: List[str] = field(default_factory=list)
+    ranking_method: Optional[str] = None
+    ranking_confidence: Optional[float] = None
+    ranking_stats: Dict[str, Any] = field(default_factory=dict)
 
     # ==========================================
     # RESPONSE GENERATION
@@ -83,12 +92,16 @@ class ConversationState:
     suggestions: List[str] = field(default_factory=list)
     assistant_message: Optional[str] = None
 
-
-        # Add after your existing fields, maybe in a "ROUTING" section:
+    # ==========================================
+    # ROUTING
+    # ==========================================
     use_rule_based_path: bool = False
     routing_confidence: float = 0.0
     confidence_breakdown: Dict[str, Any] = field(default_factory=dict)
     extracted_params: Dict[str, Any] = field(default_factory=dict)
+
+    trip_reason: Optional[str] = None
+    travel_group: Optional[str] = None
 
     # ==========================================
     # COMPLETION
@@ -109,10 +122,8 @@ class ConversationState:
     created_at: datetime = field(default_factory=datetime.utcnow)
     updated_at: datetime = field(default_factory=datetime.utcnow)
 
-    # Used for DB + Redis serialization
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
-    
 
     def get(self, key, default=None):
         return getattr(self, key, default)
@@ -123,6 +134,17 @@ class ConversationState:
     def __setitem__(self, key, value):
         setattr(self, key, value)
 
+
+# ============================================================
+# IMMUTABLE FIELDS PROTECTION
+# ============================================================
+
+IMMUTABLE_FIELDS = {
+    "session_id",
+    "user_id",
+    "created_at",
+    "session_token",
+}
 
 
 # ============================================================
@@ -150,12 +172,21 @@ def create_initial_state(
 
 def update_state(state: ConversationState, updates: Dict[str, Any]) -> ConversationState:
     """
-    Safely update state — LangGraph works perfectly with dataclass mutation.
+    Safely update state — filters out immutable fields.
     """
-    for key, value in updates.items():
-        setattr(state, key, value)
-
+    safe_updates = {
+        k: v for k, v in updates.items() 
+        if k not in IMMUTABLE_FIELDS
+    }
+    
+    for key, value in safe_updates.items():
+        if hasattr(state, key):
+            setattr(state, key, value)
+        else:
+            logger.warning(f"[UpdateState] Unknown field '{key}' - ignoring")
+    
     state.updated_at = datetime.utcnow()
+    
     return state
 
 
@@ -185,5 +216,3 @@ def is_ready_for_search(state: ConversationState) -> bool:
         and len(state.destination_airports) > 0
         and len(state.origin_airports) > 0
     )
-
-

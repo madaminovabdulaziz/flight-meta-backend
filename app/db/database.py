@@ -12,6 +12,7 @@ try:
     engine = create_async_engine(
         settings.get_database_url,  # Changed from settings.DATABASE_URL
         pool_pre_ping=True,
+        pool_recycle=3600,
         echo=False  # Set to True for SQL debugging
     )
     logger.info("✅ Async database engine created successfully.")

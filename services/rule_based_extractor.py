@@ -1,228 +1,49 @@
 """
-Rule-Based Parameter Extractor
-Extract flight parameters using regex + dateparser - NO LLM for 80% of cases.
-
-This module handles parameter extraction using lightweight NLP,
-achieving 80-90% success rate with 10-50ms latency and zero cost.
-
-Usage:
-    from services.rule_based_extractor import rule_extractor
-    
-    extracted, confidence = rule_extractor.extract(message, state)
-    if confidence > 0.80:
-        # Use extracted parameters
-    else:
-        # Fallback to LLM
+Rule-Based Parameter Extractor - CONTEXT AWARE FIXED VERSION
+============================================================
+Extracts travel parameters from natural language with actual intelligence.
+Fixed to respect conversation context (prevents the "Amnesia Loop").
 """
 
 import re
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from typing import Dict, Any, Tuple, Optional
-import dateparser
-
-
-def _get_state_value(state: Any, key: str) -> Any:
-    """Support both dict-like and dataclass ConversationState."""
-    if isinstance(state, dict):
-        return state.get(key)
-    return getattr(state, key, None)
+from dateparser.search import search_dates
 
 
 class RuleBasedExtractor:
-    """
-    Extract flight parameters without LLM.
-    
-    Uses regex patterns and lightweight NLP (dateparser)
-    to extract structured data from natural language.
-    """
     
     # ========================================
-    # REGEX PATTERNS
+    # CONSTANTS
     # ========================================
     
-    # Airport code: 3 uppercase letters
-    AIRPORT_PATTERN = re.compile(r'\b[A-Z]{3}\b')
+    NOISE_WORDS = {
+        "want", "fly", "book", "going", "travel", "trip", "visit", 
+        "need", "looking", "planning", "thinking", "flight", "flights"
+    }
     
-    # Passengers: number + keyword (base pattern)
-    PASSENGER_PATTERN = re.compile(
-        r'(\d+)\s*(?:passenger|passengers|people|person|pax|adult|adults|traveler|traveller)',
-        re.IGNORECASE
-    )
-    
-    # Special case: "with 2 friends" → user + 2 friends
-    FRIENDS_PATTERN = re.compile(
-        r'with\s+(\d+)\s+friends?',
-        re.IGNORECASE
-    )
-    
-    # Budget: currency symbol + number
-    BUDGET_PATTERN = re.compile(r'[£$€](\d+(?:,\d{3})*(?:\.\d{2})?)')
-    
-    # Budget: number + currency word
-    BUDGET_WORD_PATTERN = re.compile(
-        r'(\d+(?:,\d{3})*)\s*(?:pound|pounds|dollar|dollars|euro|euros|gbp|usd|eur)',
-        re.IGNORECASE
-    )
-    
-    # Flexibility: ±N days
-    FLEXIBILITY_PATTERN = re.compile(r'[±+]\s*(\d+)\s*day', re.IGNORECASE)
-    
-    # Route patterns: “from X to Y”, “X to Y”, “to X from Y”
-    FROM_TO_PATTERN = re.compile(
-        r'\bfrom\s+(?P<origin>[^,.;]+?)\s+(?:to|→|-)\s+(?P<dest>[^,.;]+)',
-        re.IGNORECASE
-    )
-    TO_FROM_PATTERN = re.compile(
-        r'\bto\s+(?P<dest>[^,.;]+?)\s+from\s+(?P<origin>[^,.;]+)',
-        re.IGNORECASE
-    )
-    SIMPLE_TO_PATTERN = re.compile(
-        r'\b(?:to|trip to|fly to|flight to)\s+(?P<dest>[^,.;]+)',
-        re.IGNORECASE
-    )
-    SIMPLE_FROM_PATTERN = re.compile(
-        r'\bfrom\s+(?P<origin>[^,.;]+)',
-        re.IGNORECASE
-    )
-    
-    # Date phrase pattern: “departing/on/for <something>”
-    DATE_PHRASE_PATTERN = re.compile(
-        r'\b(departing|departure|on|for)\s+([^,.;]+)',
-        re.IGNORECASE
-    )
-    
-    # ========================================
-    # CITY → AIRPORT MAPPING (Top 50 + a few extras)
-    # ========================================
+    CONTEXT_KEYWORDS = {
+        "culture": "culture", "museum": "culture", "history": "culture",
+        "business": "business", "meeting": "business", "work": "business",
+        "romantic": "romantic", "couple": "romantic", "honeymoon": "romantic",
+        "family": "family", "kids": "family",
+        "friends": "friends", "party": "friends"
+    }
     
     CITY_TO_AIRPORT = {
-        # Europe
-        "istanbul": "IST",
-        "london": "LHR",
-        "paris": "CDG",
-        "barcelona": "BCN",
-        "rome": "FCO",
-        "amsterdam": "AMS",
-        "berlin": "BER",
-        "madrid": "MAD",
-        "vienna": "VIE",
-        "prague": "PRG",
-        "athens": "ATH",
-        "lisbon": "LIS",
-        "dublin": "DUB",
-        "copenhagen": "CPH",
-        "stockholm": "ARN",
-        # Asia
-        "dubai": "DXB",
-        "tokyo": "NRT",
-        "singapore": "SIN",
-        "hong kong": "HKG",
-        "bangkok": "BKK",
-        "kuala lumpur": "KUL",
-        "seoul": "ICN",
-        "beijing": "PEK",
-        "shanghai": "PVG",
-        "delhi": "DEL",
-        "mumbai": "BOM",
-        "taipei": "TPE",
-        # Americas
-        "new york": "JFK",
-        "los angeles": "LAX",
-        "chicago": "ORD",
-        "miami": "MIA",
-        "toronto": "YYZ",
-        "san francisco": "SFO",
-        "boston": "BOS",
-        "washington": "IAD",
-        "las vegas": "LAS",
-        "seattle": "SEA",
-        "vancouver": "YVR",
-        "mexico city": "MEX",
-        # Middle East
-        "doha": "DOH",
-        "abu dhabi": "AUH",
-        "riyadh": "RUH",
-        "muscat": "MCT",
-        "cairo": "CAI",
-        # Oceania & Others
-        "sydney": "SYD",
-        "melbourne": "MEL",
-        "auckland": "AKL",
-        "johannesburg": "JNB",
-        # Extra for your tests
-        "tashkent": "TAS",
-        "france": "CDG",  # crude but OK for “France sounds good”
-        "europe": None,   # region, we won’t map to airport
+        "london": "LHR", "paris": "CDG", "new york": "JFK", "tokyo": "NRT",
+        "istanbul": "IST", "tashkent": "TAS", "dubai": "DXB", "singapore": "SIN",
+        "rome": "FCO", "barcelona": "BCN", "madrid": "MAD", "berlin": "BER",
+        "amsterdam": "AMS", "frankfurt": "FRA", "munich": "MUC"
     }
     
-    # ========================================
-    # TRAVEL CLASS MAPPING
-    # ========================================
-    
-    TRAVEL_CLASS_KEYWORDS = {
-        "business class": "Business",
-        "business": "Business",
-        "first class": "First",
-        "first": "First",
-        "economy class": "Economy",
-        "economy": "Economy",
-        "coach": "Economy",
-        "premium economy": "Premium Economy",
-        "premium": "Premium Economy",
+    CLASS_PATTERNS = {
+        "business": re.compile(r'\b(business|biz)\b', re.IGNORECASE),
+        "first": re.compile(r'\bfirst\s*class\b', re.IGNORECASE),
+        "premium economy": re.compile(r'\bpremium\s*economy\b', re.IGNORECASE),
+        "economy": re.compile(r'\b(economy|coach)\b', re.IGNORECASE)
     }
-    
-    # ========================================
-    # HELPERS
-    # ========================================
-    
-    @staticmethod
-    def _normalize_place_to_airport(place: str) -> Optional[str]:
-        """Map a raw city/airport string to a 3-letter airport code if possible."""
-        if not place:
-            return None
-        s = place.strip().lower()
-        
-        # direct city mapping
-        if s in RuleBasedExtractor.CITY_TO_AIRPORT:
-            return RuleBasedExtractor.CITY_TO_AIRPORT[s]
-        
-        # try to detect 3-letter code in the string
-        m = re.search(r'\b([a-z]{3})\b', s)
-        if m:
-            return m.group(1).upper()
-        
-        return None
-    
-    @staticmethod
-    def _parse_date_from_message(message: str) -> Optional[date]:
-        """
-        Extract a date using a smaller phrase if possible, otherwise fall back to whole message.
-        Handles things like 'departing December 15th', 'next Monday', 'in two weeks', etc.
-        """
-        phrase = None
-        
-        m = RuleBasedExtractor.DATE_PHRASE_PATTERN.search(message)
-        if m:
-            phrase = m.group(2)
-        else:
-            # fallback: whole message
-            phrase = message
-        
-        parsed_date = dateparser.parse(
-            phrase,
-            settings={
-                'PREFER_DATES_FROM': 'future',
-                'RELATIVE_BASE': datetime.now()
-            }
-        )
-        if not parsed_date:
-            return None
-        
-        d = parsed_date.date()
-        if d < date.today():
-            return None
-        return d
-    
+
     # ========================================
     # MAIN EXTRACTION
     # ========================================
@@ -230,261 +51,214 @@ class RuleBasedExtractor:
     @staticmethod
     def extract(message: str, state: Any) -> Tuple[Dict[str, Any], float]:
         """
-        Extract parameters with confidence score.
-        
-        Args:
-            message: User's message
-            state: Current conversation state (dict or ConversationState)
-        
-        Returns:
-            (extracted_params, confidence) where:
-            - extracted_params: Dict of extracted values
-            - confidence: 0.0-1.0 (based on extraction success)
+        Extract travel parameters with human-level understanding.
+        Returns: (extracted_params, confidence)
         """
-        
         extracted: Dict[str, Any] = {}
         confidence_scores = []
-        msg_lower = message.lower()
         
-        # Normalize current state values
-        current_destination = _get_state_value(state, "destination")
-        current_origin = _get_state_value(state, "origin")
-        current_departure = _get_state_value(state, "departure_date")
-        current_return = _get_state_value(state, "return_date")
+        clean_msg = RuleBasedExtractor._clean_message(message)
         
-        # ========================================
-        # 0. ROUTE PATTERNS (from X to Y, etc.) – HIGH PRIORITY
-        # ========================================
-        
-        # from X to Y
-        m = RuleBasedExtractor.FROM_TO_PATTERN.search(message)
-        if m:
-            origin_raw = m.group("origin")
-            dest_raw = m.group("dest")
-            origin_code = RuleBasedExtractor._normalize_place_to_airport(origin_raw)
-            dest_code = RuleBasedExtractor._normalize_place_to_airport(dest_raw)
+        # ---------------------------------------------------------
+        # 0. CRITICAL FIX: CHECK CONTEXT FIRST
+        # ---------------------------------------------------------
+        missing_param = getattr(state, "missing_parameter", None)
+        found_any_city = RuleBasedExtractor._find_any_city_in_message(message)
+
+        # If we specifically asked for ORIGIN, and we found a city, FORCE it to be Origin
+        if missing_param == "origin" and found_any_city:
+            extracted["origin"] = found_any_city
+            confidence_scores.append(1.0)
+            # Prevent _extract_destination from grabbing it later
+            clean_msg = clean_msg.replace(found_any_city.lower(), "") 
+
+        # If we specifically asked for DESTINATION, and we found a city
+        elif missing_param == "destination" and found_any_city:
+            extracted["destination"] = found_any_city
+            confidence_scores.append(1.0)
             
-            if dest_code and not current_destination and "destination" not in extracted:
-                extracted["destination"] = dest_code
-                confidence_scores.append(0.95)
-            if origin_code and not current_origin and "origin" not in extracted:
-                extracted["origin"] = origin_code
-                confidence_scores.append(0.95)
+        # ---------------------------------------------------------
         
-        # to X from Y
-        if "destination" not in extracted or "origin" not in extracted:
-            m = RuleBasedExtractor.TO_FROM_PATTERN.search(message)
-            if m:
-                dest_raw = m.group("dest")
-                origin_raw = m.group("origin")
-                origin_code = RuleBasedExtractor._normalize_place_to_airport(origin_raw)
-                dest_code = RuleBasedExtractor._normalize_place_to_airport(dest_raw)
-                
-                if dest_code and not current_destination and "destination" not in extracted:
-                    extracted["destination"] = dest_code
-                    confidence_scores.append(0.95)
-                if origin_code and not current_origin and "origin" not in extracted:
-                    extracted["origin"] = origin_code
-                    confidence_scores.append(0.95)
+        # 1. ROUTE EXTRACTION (From X to Y)
+        route = RuleBasedExtractor._extract_route(message)
+        if route:
+            extracted.update(route)
+            confidence_scores.extend([0.95, 0.95])
         
-        # simple "to X" / "trip to X"
-        if "destination" not in extracted and not current_destination:
-            m = RuleBasedExtractor.SIMPLE_TO_PATTERN.search(message)
-            if m:
-                dest_raw = m.group("dest")
-                dest_code = RuleBasedExtractor._normalize_place_to_airport(dest_raw)
-                if dest_code:
-                    extracted["destination"] = dest_code
-                    confidence_scores.append(0.9)
+        # 2. DESTINATION (To X)
+        # Only run if we haven't already found it via context
+        if "destination" not in extracted:
+            dest = RuleBasedExtractor._extract_destination(clean_msg)
+            if dest:
+                extracted["destination"] = dest
+                confidence_scores.append(0.90)
         
-        # simple "from Y"
-        if "origin" not in extracted and not current_origin:
-            m = RuleBasedExtractor.SIMPLE_FROM_PATTERN.search(message)
-            if m:
-                origin_raw = m.group("origin")
-                origin_code = RuleBasedExtractor._normalize_place_to_airport(origin_raw)
-                if origin_code:
-                    extracted["origin"] = origin_code
-                    confidence_scores.append(0.9)
+        # 3. ORIGIN (From X)
+        if "origin" not in extracted:
+            origin = RuleBasedExtractor._extract_origin(clean_msg)
+            if origin:
+                extracted["origin"] = origin
+                confidence_scores.append(0.90)
         
-        # ========================================
-        # 1. AIRPORT CODES (Confidence: 1.0)
-        #    Only fill what is still missing.
-        # ========================================
+        # 4. DATES (Smart parsing)
+        dates = RuleBasedExtractor._extract_dates(message)
+        if dates:
+            extracted.update(dates)
+            confidence_scores.extend([0.85] * len(dates))
         
-        airport_matches = RuleBasedExtractor.AIRPORT_PATTERN.findall(message)
-        if airport_matches:
-            # First code: destination or origin based on what is missing
-            if "destination" not in extracted and not current_destination:
-                extracted["destination"] = airport_matches[0]
-                confidence_scores.append(1.0)
-            elif "origin" not in extracted and not current_origin:
-                extracted["origin"] = airport_matches[0]
-                confidence_scores.append(1.0)
-            
-            # Second code: likely the other one
-            if len(airport_matches) > 1:
-                if "origin" not in extracted and not current_origin:
-                    extracted["origin"] = airport_matches[1]
-                    confidence_scores.append(1.0)
+        # 5. PASSENGERS (Infer correctly)
+        passengers = RuleBasedExtractor._extract_passengers(message)
+        if passengers:
+            extracted["passengers"] = passengers
+            confidence_scores.append(0.95)
         
-        # ========================================
-        # 2. CITY NAMES (Confidence: 0.9)
-        #    Fallback if route patterns didn’t catch them.
-        # ========================================
+        # 6. TRAVEL CLASS
+        travel_class = RuleBasedExtractor._extract_class(message)
+        if travel_class:
+            extracted["travel_class"] = travel_class
+            confidence_scores.append(1.0)
         
-        sorted_cities = sorted(
-            RuleBasedExtractor.CITY_TO_AIRPORT.items(),
-            key=lambda x: len(x[0]),
-            reverse=True
-        )
+        # 7. CONTEXT (Trip reason)
+        context = RuleBasedExtractor._extract_context(message)
+        if context:
+            extracted.update(context)
         
-        for city, airport_code in sorted_cities:
-            if not airport_code:
-                continue  # skip region-like keys (e.g. "europe")
-            if city in msg_lower:
-                # Determine if it's destination or origin (still missing)
-                if not current_destination and "destination" not in extracted:
-                    extracted["destination"] = airport_code
-                    confidence_scores.append(0.9)
-                elif not current_origin and "origin" not in extracted:
-                    extracted["origin"] = airport_code
-                    confidence_scores.append(0.9)
-                # Don't break; user might mention both origin and destination
+        # Calculate average confidence
+        if not confidence_scores:
+            return extracted, 0.0
         
-        # ========================================
-        # 3. DATES (Confidence: 0.85)
-        # ========================================
-        
-        parsed_date_obj = RuleBasedExtractor._parse_date_from_message(message)
-        if parsed_date_obj:
-            if not current_departure and "departure_date" not in extracted:
-                extracted["departure_date"] = parsed_date_obj
-                confidence_scores.append(0.85)
-            elif current_departure and parsed_date_obj > current_departure and "return_date" not in extracted and not current_return:
-                extracted["return_date"] = parsed_date_obj
-                confidence_scores.append(0.85)
-        
-        # ========================================
-        # 4. PASSENGERS (Confidence: 0.95)
-        # ========================================
-        
-        # Special "with 2 friends" → user + friends
-        friend_match = RuleBasedExtractor.FRIENDS_PATTERN.search(message)
-        if friend_match:
-            count = int(friend_match.group(1)) + 1  # user + friends
-            if 1 <= count <= 9:
-                extracted["passengers"] = count
-                confidence_scores.append(0.95)
-        else:
-            # Generic pattern: "2 passengers", "3 people", etc.
-            passenger_match = RuleBasedExtractor.PASSENGER_PATTERN.search(message)
-            if passenger_match:
-                count = int(passenger_match.group(1))
-                if 1 <= count <= 9:
-                    extracted["passengers"] = count
-                    confidence_scores.append(0.95)
-        
-        # ========================================
-        # 5. TRAVEL CLASS (Confidence: 1.0)
-        # ========================================
-        
-        sorted_classes = sorted(
-            RuleBasedExtractor.TRAVEL_CLASS_KEYWORDS.items(),
-            key=lambda x: len(x[0]),
-            reverse=True
-        )
-        
-        for keyword, class_name in sorted_classes:
-            if keyword in msg_lower:
-                extracted["travel_class"] = class_name
-                confidence_scores.append(1.0)
-                break  # Take first match
-        
-        # ========================================
-        # 6. BUDGET (Confidence: 0.9)
-        # ========================================
-        
-        budget_match = RuleBasedExtractor.BUDGET_PATTERN.search(message)
-        if budget_match:
-            budget_str = budget_match.group(1).replace(',', '')
-            extracted["budget"] = float(budget_str)
-            confidence_scores.append(0.9)
-        else:
-            budget_word_match = RuleBasedExtractor.BUDGET_WORD_PATTERN.search(message)
-            if budget_word_match:
-                budget_str = budget_word_match.group(1).replace(',', '')
-                extracted["budget"] = float(budget_str)
-                confidence_scores.append(0.85)
-        
-        # ========================================
-        # 7. FLEXIBILITY (Confidence: 0.9)
-        # ========================================
-        
-        flex_match = RuleBasedExtractor.FLEXIBILITY_PATTERN.search(message)
-        if flex_match:
-            extracted["flexibility"] = int(flex_match.group(1))
-            confidence_scores.append(0.9)
-        
-        # ========================================
-        # 8. CALCULATE OVERALL CONFIDENCE
-        # ========================================
-        
-        if confidence_scores:
-            overall_confidence = sum(confidence_scores) / len(confidence_scores)
-        else:
-            overall_confidence = 0.0
-        
-        return extracted, overall_confidence
+        avg_conf = sum(confidence_scores) / len(confidence_scores)
+        return extracted, avg_conf
+    
+    # ========================================
+    # EXTRACTION HELPERS
+    # ========================================
+
+    @staticmethod
+    def _find_any_city_in_message(message: str) -> Optional[str]:
+        """Helper to find ANY known city in the message without assigning intent."""
+        for city, code in RuleBasedExtractor.CITY_TO_AIRPORT.items():
+            if re.search(rf'\b{city}\b', message, re.IGNORECASE):
+                return code
+        return None
+
+    @staticmethod
+    def _clean_message(message: str) -> str:
+        """Remove noise words that interfere with extraction."""
+        words = message.split()
+        cleaned = [w for w in words if w.lower() not in RuleBasedExtractor.NOISE_WORDS]
+        return " ".join(cleaned)
     
     @staticmethod
-    def get_confidence_threshold() -> float:
-        """
-        Get the recommended confidence threshold.
+    def _extract_route(message: str) -> Optional[Dict[str, str]]:
+        """Extract full route: 'From London to Paris'"""
+        pattern = re.compile(
+            r'\bfrom\s+([A-Za-z\s]+?)\s+to\s+([A-Za-z\s]+?)(?:\s|$|,|\.)',
+            re.IGNORECASE
+        )
+        match = pattern.search(message)
+        if match:
+            origin = RuleBasedExtractor._resolve_location(match.group(1).strip())
+            dest = RuleBasedExtractor._resolve_location(match.group(2).strip())
+            if origin and dest:
+                return {
+                    "origin": origin,
+                    "destination": dest,
+                    "origin_airports": [origin] if len(origin) == 3 else [],
+                    "destination_airports": [dest] if len(dest) == 3 else []
+                }
+        return None
+    
+    @staticmethod
+    def _extract_destination(message: str) -> Optional[str]:
+        """Extract destination: 'to Paris' OR fallback to standalone city"""
+        # Explicit 'to' pattern
+        pattern = re.compile(r'\bto\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\b', re.IGNORECASE)
+        match = pattern.search(message)
+        if match:
+            dest_raw = match.group(1).strip()
+            if dest_raw.lower() not in ["fly", "go", "travel", "book"]:
+                return RuleBasedExtractor._resolve_location(dest_raw)
         
-        Below this threshold, LLM fallback is recommended.
+        # Fallback: Standalone city names (ONLY if not caught by explicit 'from')
+        return RuleBasedExtractor._find_any_city_in_message(message)
+    
+    @staticmethod
+    def _extract_origin(message: str) -> Optional[str]:
+        """Extract origin: 'from London'"""
+        pattern = re.compile(r'\bfrom\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\b', re.IGNORECASE)
+        match = pattern.search(message)
+        if match:
+            return RuleBasedExtractor._resolve_location(match.group(1).strip())
+        return None
+    
+    @staticmethod
+    def _extract_dates(message: str) -> Dict[str, date]:
+        dates = {}
+        today = date.today()
+        relative_patterns = {
+            r'\bnext week\b': today + timedelta(days=7),
+            r'\bthis weekend\b': RuleBasedExtractor._get_next_saturday(),
+            r'\btomorrow\b': today + timedelta(days=1),
+        }
+        for pattern, target_date in relative_patterns.items():
+            if re.search(pattern, message, re.IGNORECASE):
+                dates["departure_date"] = target_date
+                break
         
-        Returns:
-            0.80 - optimal balance of speed and accuracy
-        """
-        return 0.80
+        if not dates:
+            try:
+                found_dates = search_dates(message, settings={'PREFER_DATES_FROM': 'future', 'RELATIVE_BASE': datetime.now()})
+                if found_dates:
+                    valid = [d[1].date() for d in found_dates if d[1].date() >= today]
+                    if valid:
+                        dates["departure_date"] = valid[0]
+                        if len(valid) > 1: dates["return_date"] = valid[1]
+            except Exception: pass
+        return dates
+    
+    @staticmethod
+    def _extract_passengers(message: str) -> Optional[int]:
+        msg_lower = message.lower()
+        match = re.search(r'with\s+(\d+)\s+(friend|colleague|people|person)', msg_lower)
+        if match: return int(match.group(1)) + 1
+        match = re.search(r'(\d+)\s+(passenger|adult|traveler|people)', msg_lower)
+        if match: return int(match.group(1))
+        return None
+    
+    @staticmethod
+    def _extract_class(message: str) -> Optional[str]:
+        for cls, pattern in RuleBasedExtractor.CLASS_PATTERNS.items():
+            if pattern.search(message): return cls.title()
+        return None
+    
+    @staticmethod
+    def _extract_context(message: str) -> Dict[str, str]:
+        context = {}
+        msg_lower = message.lower()
+        for keyword, category in RuleBasedExtractor.CONTEXT_KEYWORDS.items():
+            if keyword in msg_lower:
+                context["trip_reason"] = category
+                break
+        if "friends" in msg_lower: context["travel_group"] = "friends"
+        elif "family" in msg_lower: context["travel_group"] = "family"
+        elif "solo" in msg_lower: context["travel_group"] = "solo"
+        return context
+    
+    @staticmethod
+    def _resolve_location(text: str) -> Optional[str]:
+        if not text: return None
+        clean = text.strip().lower()
+        if len(clean) == 3 and clean.isalpha(): return clean.upper()
+        if clean in RuleBasedExtractor.CITY_TO_AIRPORT: return RuleBasedExtractor.CITY_TO_AIRPORT[clean]
+        return text.strip().title()
+    
+    @staticmethod
+    def _get_next_saturday() -> date:
+        today = date.today()
+        days_ahead = 5 - today.weekday()
+        if days_ahead <= 0: days_ahead += 7
+        return today + timedelta(days=days_ahead)
 
-
-# ============================================================
-# SINGLETON INSTANCE
-# ============================================================
 
 rule_extractor = RuleBasedExtractor()
-
-
-# ============================================================
-# CONVENIENCE FUNCTIONS
-# ============================================================
-
-def extract_parameters(message: str, state: Dict[str, Any]) -> Tuple[Dict[str, Any], float]:
-    """
-    Convenience function for parameter extraction.
-    
-    Args:
-        message: User's message
-        state: Current conversation state
-    
-    Returns:
-        (extracted_params, confidence)
-    """
-    return rule_extractor.extract(message, state)
-
-
-def should_use_llm_for_extraction(message: str, state: Dict[str, Any]) -> bool:
-    """
-    Determine if LLM fallback is needed for parameter extraction.
-    
-    Args:
-        message: User's message
-        state: Current conversation state
-    
-    Returns:
-        True if confidence is too low and LLM should be used
-    """
-    _, confidence = rule_extractor.extract(message, state)
-    return confidence < rule_extractor.get_confidence_threshold()

@@ -173,10 +173,10 @@ async def should_use_llm_node(state: ConversationState) -> ConversationState:
     }
 
     # Apply extracted params immediately if using rule-based path
-    if use_rule:
-        normalized = _normalize_extracted_params(extracted)
-        updates.update(normalized)
-        logger.info(f"[ShouldUseLLM] Applied {len(normalized)} extracted params to state")
+    # if use_rule:
+    #     normalized = _normalize_extracted_params(extracted)
+    #     updates.update(normalized)
+    #     logger.info(f"[ShouldUseLLM] Applied {len(normalized)} extracted params to state")
 
     # 🔧 FIX: Always return updated state (was missing for LLM path)
     updated_state = update_state(state, updates)
@@ -194,41 +194,22 @@ async def should_use_llm_node(state: ConversationState) -> ConversationState:
 # ROUTER – READS THE DECISION
 # ============================================================================
 
+# ... inside route_based_on_confidence ...
+
 def route_based_on_confidence(state: ConversationState) -> Literal["rule_based_path", "llm_path"]:
     """
     Router function that reads the decision made by should_use_llm_node.
-    This is called by LangGraph's conditional edge.
     """
-    # DEBUG: Log everything to see what we're receiving
-    logger.error(f"[ROUTER DEBUG] State type: {type(state)}")
-    logger.error(f"[ROUTER DEBUG] State is dict? {isinstance(state, dict)}")
-    logger.error(f"[ROUTER DEBUG] Has 'use_rule_based_path' attr? {hasattr(state, 'use_rule_based_path')}")
-    
-    # Try both dict and attribute access
-    if isinstance(state, dict):
-        use_rule = state.get("use_rule_based_path", False)
-        conf = state.get("routing_confidence", 0.0)
-        logger.error(f"[ROUTER DEBUG] Dict access: use_rule={use_rule}, conf={conf}")
-    else:
-        use_rule = getattr(state, "use_rule_based_path", False)
-        conf = getattr(state, "routing_confidence", 0.0)
-        logger.error(f"[ROUTER DEBUG] Attr access: use_rule={use_rule}, conf={conf}")
-    
-    # Try to print ALL available keys/attributes
-    if isinstance(state, dict):
-        logger.error(f"[ROUTER DEBUG] Available keys: {list(state.keys())[:10]}")
-    else:
-        logger.error(f"[ROUTER DEBUG] Dir of state: {[x for x in dir(state) if not x.startswith('_')][:10]}")
+    # Safe attribute access
+    use_rule = getattr(state, "use_rule_based_path", False)
+    conf = getattr(state, "routing_confidence", 0.0)
     
     routing_path = "rule_based_path" if use_rule else "llm_path"
 
-    logger.info(
-        f"[Route] → {routing_path.upper()} "
-        f"(use_rule={use_rule}, confidence={conf:.3f})"
-    )
+    # Info log is sufficient
+    logger.info(f"[Router] Decided: {routing_path} (Conf: {conf:.2f})")
 
     return routing_path
-
 
 # ============================================================================
 # DEBUGGING / METRICS

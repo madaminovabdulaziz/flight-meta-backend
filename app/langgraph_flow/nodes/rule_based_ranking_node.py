@@ -26,18 +26,29 @@ MAX_FLIGHTS_TO_RANK = 50
 # ==========================================
 
 def _validate_flight(flight: Any) -> bool:
+    """
+    Validate that flight has required fields for ranking.
+    
+    FIXED: Now checks for duration_minutes (actual field name from flight_service)
+    """
     if not isinstance(flight, dict):
         return False
 
-    for field in REQUIRED_FLIGHT_FIELDS:
-        if field not in flight:
-            return False
+    # Check price
+    if "price" not in flight:
+        return False
+    if not isinstance(flight["price"], (int, float)):
+        return False
 
-        if field == "price" and not isinstance(flight[field], (int, float)):
-            return False
+    # Check duration (flight_service returns "duration_minutes")
+    if "duration_minutes" not in flight:
+        return False
+    if not isinstance(flight["duration_minutes"], (int, float)):
+        return False
 
-        if field == "duration" and not isinstance(flight[field], (int, float)):
-            return False
+    # Check airline
+    if "airline" not in flight and "airline_name" not in flight:
+        return False
 
     return True
 

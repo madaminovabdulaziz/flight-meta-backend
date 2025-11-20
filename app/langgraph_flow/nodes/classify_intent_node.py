@@ -30,12 +30,25 @@ INTENT_LABELS = [
 
 DEFAULT_INTENT = "travel_query"
 
-SYSTEM_PROMPT = """Classify the user's message for a flight search assistant.
+SYSTEM_PROMPT = """
+You are an intent classifier for a travel chatbot.
+Allowed Intents:
+- travel_query
+- destination_provided
+- origin_provided
+- date_provided
+- budget_provided
+- preference_provided
+- change_of_plan
+- irrelevant
+- chitchat
 
-Labels: travel_query, destination_provided, origin_provided, date_provided,
-budget_provided, preference_provided, change_of_plan, irrelevant, chitchat.
-
-Return JSON: {"intent": "<label>"}"""
+INSTRUCTIONS:
+1. Analyze the user message.
+2. Select EXACTLY ONE intent from the list above.
+3. If multiple apply, pick the most dominant one (e.g. "To Paris tomorrow" -> destination_provided).
+4. Return JSON: {"intent": "your_label"}
+"""
 
 # ==========================================
 # MAIN NODE – DATACLASS SAFE VERSION

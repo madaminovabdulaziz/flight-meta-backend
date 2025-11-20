@@ -1,0 +1,117 @@
+.
+├── Dockerfile
+├── Procfile
+├── alembic
+│   ├── README
+│   ├── env.py
+│   ├── script.py.mako
+│   └── versions
+│       ├── 5c2a8064ec03_add_ai_trip_planner_models.py
+│       └── e43fa38b5d45_add_performance_indexes.py
+├── alembic.ini
+├── app
+│   ├── __init__.py
+│   ├── api
+│   │   ├── __init__.py
+│   │   └── v1
+│   │       ├── __init__.py
+│   │       ├── dependencies.py
+│   │       └── endpoints
+│   │           ├── airports.py
+│   │           ├── auth.py
+│   │           ├── chat.py
+│   │           ├── duffel_ai.py
+│   │           ├── duffel_flexible.py
+│   │           ├── duffel_new.py
+│   │           ├── email_collection.py
+│   │           ├── nearest_airport.py
+│   │           └── webhooks.py
+│   ├── core
+│   │   ├── __init__.py
+│   │   ├── config.py
+│   │   ├── localization.py
+│   │   ├── security.py
+│   │   └── webhook_utils.py
+│   ├── db
+│   │   ├── crud
+│   │   │   ├── __init__.py
+│   │   │   └── session.py
+│   │   └── database.py
+│   ├── integrations
+│   │   ├── __init__.py
+│   │   └── qdrant_client.py
+│   ├── langgraph_flow
+│   │   ├── __init__.py
+│   │   ├── graph.py
+│   │   ├── nodes
+│   │   │   ├── __init__.py
+│   │   │   ├── ask_next_question_node.py
+│   │   │   ├── classify_intent_node.py
+│   │   │   ├── determine_missing_slot_node.py
+│   │   │   ├── entry_node.py
+│   │   │   ├── extract_parameters_node.py
+│   │   │   ├── finalize_response_node.py
+│   │   │   ├── flight_search_node.py
+│   │   │   ├── load_session_state_node.py
+│   │   │   ├── load_user_memory_node.py
+│   │   │   ├── ranking_node.py
+│   │   │   ├── refusal_node.py
+│   │   │   ├── rule_based_question_node.py
+│   │   │   ├── rule_based_ranking_node.py
+│   │   │   └── should_use_llm_node.py
+│   │   └── state.py
+│   ├── main.py
+│   ├── mappers
+│   │   ├── flight_transformers.py
+│   │   └── travelpayouts_mapper.py
+│   ├── models
+│   │   └── models.py
+│   └── tasks
+│       ├── __init__.py
+│       ├── cache_tasks.py
+│       └── celery_app.py
+├── debug.py
+├── dump.rdb
+├── index.html
+├── mindmap
+│   ├── features.html
+│   ├── flight_card.html
+│   ├── full_page.html
+│   ├── heatmap.html
+│   ├── landing-page.html
+│   └── mindmap.html
+├── project_tree.txt
+├── railway.json
+├── railway.toml
+├── requirements.txt
+├── schemas
+│   ├── airports.py
+│   ├── flight_segment.py
+│   ├── hot_routes.py
+│   ├── saved_search.py
+│   ├── token.py
+│   ├── users.py
+│   └── webhooks.py
+├── scripts
+├── services
+│   ├── __init__.py
+│   ├── airport_service.py
+│   ├── amadeus_service.py
+│   ├── cheap_ranker.py
+│   ├── embedding_service.py
+│   ├── exceptions.py
+│   ├── flight_service.py
+│   ├── ip_geolocation.py
+│   ├── llm_service.py
+│   ├── local_intent_classifier.py
+│   ├── locust.py
+│   ├── memory_service.py
+│   ├── preference_service.py
+│   ├── ranking_explanation.py
+│   ├── rule_based_extractor.py
+│   ├── session_store.py
+│   └── template_engine.py
+├── start.sh
+└── test_results.json
+
+20 directories, 95 files

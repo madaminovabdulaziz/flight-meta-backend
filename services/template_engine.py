@@ -1,456 +1,265 @@
 """
-Template Engine
-Deterministic text generation - NO LLM needed for questions, labels, summaries, tradeoffs.
+Template Engine (UI-Ready Version)
+==================================
+Generates context-aware questions and structured "Pills" for the frontend.
+Matches the 'Travo' UX style (Label + Icon + Value).
 
-This module generates ALL non-personalized text using templates and rules,
-achieving consistent quality with <1ms latency and zero cost.
-
-Usage:
-    from services.template_engine import template_engine
-    
-    question = template_engine.generate_question("destination", state)
-    label = template_engine.generate_label(flight, rank, all_flights)
-    summary = template_engine.generate_summary(flight)
-    tradeoffs = template_engine.generate_tradeoffs(flight, all_flights)
+Features:
+1. Structured Suggestions (Pills) for React UI.
+2. Context Awareness (Trip Reason, Group Type).
+3. Aviation SME Logic (MCT checks, Red-eye detection).
 """
 
-from typing import Dict, Any, List
-
+from typing import Dict, Any, List, Optional
+from datetime import date, timedelta
 
 class TemplateEngine:
     """
     Generate all deterministic text without LLM.
-    
-    Handles:
-    - Questions for missing parameters
-    - Flight labels (Best Overall, Cheapest, etc.)
-    - Flight summaries (one-line descriptions)
-    - Tradeoffs (honest considerations)
     """
     
     # ========================================
-    # QUESTION TEMPLATES
+    # 1. CONTEXT-AWARE QUESTION GENERATION
     # ========================================
     
     @staticmethod
     def generate_question(missing_param: str, state: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Generate question for missing parameter using templates.
+        Generate a personalized question with UI-ready pills.
         
         Args:
-            missing_param: Name of missing parameter
+            missing_param: The slot to fill (e.g., 'departure_date')
             state: Current conversation state
         
         Returns:
-            Dict with: message, placeholder, suggestions
-        
-        Example:
-            >>> generate_question("destination", {})
-            {
-                "message": "Great! Where would you like to fly to?",
-                "placeholder": "Where are you flying to?",
-                "suggestions": ["Istanbul", "Dubai", "London", "Paris"]
-            }
+            Dict with 'message', 'placeholder', and 'suggestions' (List of Dicts).
         """
         
-        # Get context from state
-        destination = state.get("destination", "your destination")
+        # Extract Context
+        dest = state.get("destination", "your destination")
+        origin = state.get("origin", "your origin")
+        
+        # Context variables (populated by RuleBasedExtractor)
+        reason = state.get("trip_reason")       # e.g., "culture", "business"
+        group = state.get("travel_group")       # e.g., "friends", "family"
         prefs = state.get("long_term_preferences", {})
-        
-        templates = {
-            "destination": {
-                "message": "Great! Where would you like to fly to?",
-                "placeholder": "Where are you flying to?",
-                "suggestions": TemplateEngine._get_popular_destinations()
-            },
+
+        # --- A. DEPARTURE DATE (Calendar Pills) ---
+        if missing_param == "departure_date":
+            if reason == "culture":
+                msg = f"I bet {dest} has amazing museums! When are you planning to explore?"
+            elif group == "friends":
+                msg = f"A trip to {dest} with friends sounds fun! When is the group planning to fly?"
+            elif reason == "business":
+                msg = f"Understood. When do you need to be in {dest} for work?"
+            else:
+                msg = f"Perfect! When would you like to fly to {dest}?"
+
+            return {
+                "message": msg,
+                "placeholder": "Select dates",
+                "suggestions": [
+                    {"label": "Next weekend", "value": "next_weekend", "icon": "📅", "type": "date"},
+                    {"label": "Next month", "value": "next_month", "icon": "📅", "type": "date"},
+                    {"label": "Flexible dates", "value": "flexible", "icon": "✨", "type": "action"}
+                ]
+            }
+
+        # --- B. DESTINATION (Map Pin Pills) ---
+        if missing_param == "destination":
+            return {
+                "message": "Where is your next adventure?",
+                "placeholder": "Search destination...",
+                "suggestions": [
+                    {"label": "Istanbul", "value": "Istanbul", "icon": "🇹🇷", "type": "location"},
+                    {"label": "Dubai", "value": "Dubai", "icon": "🇦🇪", "type": "location"},
+                    {"label": "Paris", "value": "Paris", "icon": "🇫🇷", "type": "location"},
+                    {"label": "Inspire me", "value": "anywhere", "icon": "🌍", "type": "action"}
+                ]
+            }
+
+        # --- C. ORIGIN (Location Pills) ---
+        if missing_param == "origin":
+            # Use preferences if available
+            history = prefs.get("preferred_airports", [])
+            suggestions = []
             
-            "departure_date": {
-                "message": f"Perfect! When would you like to fly to {destination}?",
-                "placeholder": "When do you want to fly?",
-                "suggestions": ["This month", "Next month", "Give exact dates"]
-            },
-            
-            "origin": {
-                "message": "Which city or airport are you flying from?",
-                "placeholder": "Departure city or airport",
-                "suggestions": TemplateEngine._get_airport_suggestions(prefs)
-            },
-            
-            "return_date": {
-                "message": "When would you like to return? (or say 'one-way')",
+            if history:
+                for apt in history[:2]:
+                    suggestions.append({"label": apt, "value": apt, "icon": "🛫", "type": "location"})
+            else:
+                suggestions = [
+                    {"label": "London (LHR)", "value": "LHR", "icon": "🇬🇧", "type": "location"},
+                    {"label": "New York (JFK)", "value": "JFK", "icon": "🇺🇸", "type": "location"}
+                ]
+                
+            return {
+                "message": f"Got it. Which city or airport are you flying from to get to {dest}?",
+                "placeholder": "Departure city",
+                "suggestions": suggestions
+            }
+
+        # --- D. PASSENGERS (User Icon Pills) ---
+        if missing_param == "passengers":
+            msg = "How many people are traveling?"
+            if group == "friends": msg = "How many friends are joining you?"
+            if group == "family": msg = "How many adults and children?"
+
+            return {
+                "message": msg,
+                "placeholder": "Select travelers",
+                "suggestions": [
+                    {"label": "Solo Trip", "value": "1", "icon": "👤", "type": "pax"},
+                    {"label": "Partner Trip", "value": "2", "icon": "💑", "type": "pax"},
+                    {"label": "3 Friends", "value": "3", "icon": "👯", "type": "pax"},
+                    {"label": "Family (4)", "value": "4", "icon": "👨‍👩‍👧‍👦", "type": "pax"}
+                ]
+            }
+
+        # --- E. RETURN DATE ---
+        if missing_param == "return_date":
+            return {
+                "message": "When would you like to return?",
                 "placeholder": "Return date",
-                "suggestions": ["Same week", "One week later", "Two weeks later", "One-way"]
-            },
+                "suggestions": [
+                    {"label": "One week later", "value": "1_week", "icon": "📅", "type": "date"},
+                    {"label": "Same weekend", "value": "same_weekend", "icon": "📅", "type": "date"},
+                    {"label": "One-way", "value": "oneway", "icon": "➡️", "type": "action"}
+                ]
+            }
             
-            "passengers": {
-                "message": "How many passengers?",
-                "placeholder": "Number of passengers",
-                "suggestions": ["1", "2", "3", "4+"]
-            },
-            
-            "travel_class": {
-                "message": "Which class would you prefer?",
-                "placeholder": "Travel class",
-                "suggestions": ["Economy", "Premium Economy", "Business"]
-            },
-            
-            "budget": {
-                "message": "What's your maximum budget for this trip?",
-                "placeholder": "Maximum budget (GBP)",
-                "suggestions": ["£200", "£300", "£400", "£500+"]
-            },
-            
-            "flexibility": {
-                "message": "How flexible are you with dates?",
-                "placeholder": "Flexibility in days",
-                "suggestions": ["±1 day", "±2 days", "±3 days", "Exact dates only"]
-            },
+        # --- F. BUDGET ---
+        if missing_param == "budget":
+            return {
+                "message": "Do you have a specific budget in mind?",
+                "placeholder": "Max price",
+                "suggestions": [
+                    {"label": "Budget-friendly", "value": "300", "icon": "💸", "type": "budget"},
+                    {"label": "Standard", "value": "600", "icon": "💳", "type": "budget"},
+                    {"label": "Luxury", "value": "1500", "icon": "💎", "type": "budget"}
+                ]
+            }
+
+        # Fallback
+        return {
+            "message": f"Could you please provide the {missing_param.replace('_', ' ')}?",
+            "placeholder": "Type here...",
+            "suggestions": []
         }
-        
-        return templates.get(missing_param, templates["destination"])
-    
-    @staticmethod
-    def _get_popular_destinations() -> List[str]:
-        """Get list of popular destinations for suggestions."""
-        return ["Istanbul", "Dubai", "London", "Paris"]
-    
-    @staticmethod
-    def _get_airport_suggestions(prefs: Dict[str, Any]) -> List[str]:
-        """
-        Get personalized airport suggestions based on user preferences.
-        
-        Uses memory to suggest preferred airports.
-        """
-        preferred_airports = prefs.get("preferred_airports", [])
-        
-        if "LGW" in preferred_airports:
-            return [
-                "London Gatwick (LGW)",
-                "London Heathrow (LHR)",
-                "Other London airport"
-            ]
-        elif "LHR" in preferred_airports:
-            return [
-                "London Heathrow (LHR)",
-                "London Gatwick (LGW)",
-                "Other London airport"
-            ]
-        else:
-            # Default suggestions
-            return [
-                "London Heathrow (LHR)",
-                "London Gatwick (LGW)",
-                "London Stansted (STN)"
-            ]
-    
+
+
     # ========================================
-    # FLIGHT LABELS
+    # 2. FLIGHT LABELING (UX Badges)
     # ========================================
     
     @staticmethod
-    def generate_label(
-        flight: Dict[str, Any],
-        rank: int,
-        all_flights: List[Dict[str, Any]]
-    ) -> str:
-        """
-        Generate flight label based on properties.
-        
-        Uses deterministic rules to categorize flights.
-        
-        Args:
-            flight: Flight data
-            rank: Position in ranking (0-indexed)
-            all_flights: All available flights for comparison
-        
-        Returns:
-            Label string with emoji
-        
-        Example:
-            "💰 Cheapest Available"
-            "⚡ Fastest Option"
-            "🏆 Best Overall"
-        """
-        
+    def generate_label(flight: Dict[str, Any], rank: int, all_flights: List[Dict[str, Any]]) -> str:
+        """Generate an emoji badge for the flight card."""
         price = flight.get("price", 0)
         duration = flight.get("duration_minutes", 0)
         stops = flight.get("stops", 0)
         rating = flight.get("airline_rating", 0)
         
-        # Get min values for comparison
+        # Context stats
         prices = [f.get("price", 999999) for f in all_flights]
         durations = [f.get("duration_minutes", 999999) for f in all_flights]
-        
         min_price = min(prices) if prices else 0
         min_duration = min(durations) if durations else 0
         
-        # Rule-based labeling (priority order)
+        if price == min_price: return "💰 Cheapest"
+        if duration == min_duration: return "⚡ Fastest"
+        if stops == 0 and rating >= 4.5: return "👑 Premium Direct"
         
-        # 1. Cheapest
-        if price == min_price:
-            return "💰 Cheapest Available"
+        # Best Value Logic
+        max_p = max(prices) if prices else 1
+        max_d = max(durations) if durations else 1
+        p_score = (price - min_price) / (max_p - min_price) if max_p > min_price else 0
+        d_score = (duration - min_duration) / (max_d - min_duration) if max_d > min_duration else 0
         
-        # 2. Fastest
-        if duration == min_duration:
-            return "⚡ Fastest Option"
+        if p_score < 0.3 and d_score < 0.3: return "💎 Best Value"
+        if stops == 0: return "🎯 Direct"
         
-        # 3. Premium direct
-        if stops == 0 and rating >= 4.0:
-            return "✨ Premium Direct Flight"
-        
-        # 4. Direct (any quality)
-        if stops == 0:
-            return "🎯 Direct Flight"
-        
-        # 5. Most comfortable
-        if rating >= 4.5:
-            return "👑 Most Comfortable"
-        
-        # 6. Best overall (rank #1 that doesn't fit above)
-        if rank == 0:
-            return "🏆 Best Overall"
-        
-        # 7. Good value (low price percentile + low duration percentile)
-        price_percentile = (price - min_price) / (max(prices) - min_price) if max(prices) > min_price else 0
-        duration_percentile = (duration - min_duration) / (max(durations) - min_duration) if max(durations) > min_duration else 0
-        
-        if price_percentile < 0.4 and duration_percentile < 0.4:
-            return "💎 Best Value"
-        
-        # 8. Good connection
-        if stops == 1 and price < sum(prices) / len(prices):
-            return "🔄 Good Connection"
-        
-        # 9. Default
-        return "✈️ Recommended Option"
-    
+        return "✈️ Recommended"
+
+
     # ========================================
-    # FLIGHT SUMMARIES
+    # 3. FLIGHT SUMMARIES & TRADEOFFS (SME Logic)
     # ========================================
-    
+
     @staticmethod
     def generate_summary(flight: Dict[str, Any]) -> str:
-        """
-        Generate one-line flight summary.
-        
-        Format: "{Airline} {stops}, {duration}, departs {time}"
-        
-        Args:
-            flight: Flight data
-        
-        Returns:
-            Summary string
-        
-        Example:
-            "Turkish Airlines direct, 3h 45m, departs 09:30"
-        """
-        
+        """Generate a one-line summary string."""
         airline = flight.get("airline_name", "Unknown")
         stops = flight.get("stops", 0)
-        duration_minutes = flight.get("duration_minutes", 0)
-        departure_time = flight.get("departure_time", "")
+        duration = flight.get("duration_minutes", 0)
         
-        # Format duration
-        hours = duration_minutes // 60
-        minutes = duration_minutes % 60
-        duration_str = f"{hours}h {minutes}m" if minutes > 0 else f"{hours}h"
+        h, m = divmod(duration, 60)
+        dur_str = f"{h}h {m}m" if m else f"{h}h"
+        stop_str = "Direct" if stops == 0 else f"{stops} stop{'s' if stops > 1 else ''}"
         
-        # Format stops
-        if stops == 0:
-            stop_str = "direct"
-        elif stops == 1:
-            stop_str = "1 stop"
-        else:
-            stop_str = f"{stops} stops"
+        dep = flight.get("departure_time", "").split("T")[1][:5] if "T" in flight.get("departure_time", "") else "??"
         
-        # Extract time from ISO datetime
-        try:
-            # departure_time format: "2025-12-15T09:30:00"
-            dep_time = departure_time.split("T")[1][:5] if "T" in departure_time else "unknown"
-        except:
-            dep_time = "morning"
-        
-        return f"{airline} {stop_str}, {duration_str}, departs {dep_time}"
-    
-    # ========================================
-    # TRADEOFFS
-    # ========================================
-    
+        return f"{airline} • {stop_str} • {dur_str} • {dep}"
+
     @staticmethod
-    def generate_tradeoffs(
-        flight: Dict[str, Any],
-        all_flights: List[Dict[str, Any]]
-    ) -> List[str]:
+    def generate_tradeoffs(flight: Dict[str, Any], all_flights: List[Dict[str, Any]]) -> List[str]:
         """
-        Identify flight tradeoffs using deterministic rules.
-        
-        Returns honest considerations about:
-        - Price premium
-        - Duration penalty
-        - Layover issues
-        - Airport inconvenience
-        - Baggage fees
-        - Airline quality
-        
-        Args:
-            flight: Flight data
-            all_flights: All available flights for comparison
-        
-        Returns:
-            List of tradeoff strings (max 4)
-        
-        Example:
-            [
-                "£40 more than cheapest option",
-                "Departs from airport 45km from city",
-                "Checked baggage not included"
-            ]
+        Generate honest tradeoffs (Cons) for the UI.
+        Includes Aviation SME logic (MCT, red-eyes, etc.)
         """
-        
         tradeoffs = []
         
-        # Extract flight data
         price = flight.get("price", 0)
-        duration = flight.get("duration_minutes", 0)
-        stops = flight.get("stops", 0)
         layovers = flight.get("layovers", [])
-        dep_distance = flight.get("departure_airport_distance_to_city_km", 0)
-        arr_distance = flight.get("arrival_airport_distance_to_city_km", 0)
-        baggage = flight.get("baggage_included", True)
-        rating = flight.get("airline_rating", 0)
-        departure_time = flight.get("departure_time", "")
-        arrival_time = flight.get("arrival_time", "")
+        dep_time = flight.get("departure_time", "")
         
-        # Get comparison values
-        prices = [f.get("price", 999999) for f in all_flights]
-        durations = [f.get("duration_minutes", 999999) for f in all_flights]
-        
+        prices = [f.get("price", 0) for f in all_flights]
         min_price = min(prices) if prices else 0
-        min_duration = min(durations) if durations else 0
         
-        # ========================================
-        # RULE 1: Price Premium
-        # ========================================
-        
-        if price > min_price * 1.15:  # More than 15% over cheapest
-            premium = int(price - min_price)
-            tradeoffs.append(f"£{premium} more than cheapest option")
-        
-        # ========================================
-        # RULE 2: Duration Penalty
-        # ========================================
-        
-        if duration > min_duration * 1.3:  # More than 30% slower
-            extra_minutes = duration - min_duration
-            extra_hours = extra_minutes // 60
-            extra_mins = extra_minutes % 60
+        # 1. Price Premium
+        if price > min_price * 1.20:
+            diff = int(price - min_price)
+            tradeoffs.append(f"£{diff} more expensive")
             
-            if extra_hours > 0:
-                tradeoffs.append(f"{extra_hours}h {extra_mins}m longer than fastest option")
-            else:
-                tradeoffs.append(f"{extra_mins}m longer than fastest option")
-        
-        # ========================================
-        # RULE 3: Layover Issues
-        # ========================================
-        
+        # 2. Aviation SME: Risky Connections & Long Layovers
         for layover in layovers:
-            # Overnight layover
-            if layover.get("overnight"):
-                airport = layover.get("airport", "hub")
-                tradeoffs.append(f"Overnight layover in {airport}")
+            dur = layover.get("duration_minutes", 0)
+            loc = layover.get("airport", "HUB")
             
-            # Tight connection
-            connection_time = layover.get("min_connection_minutes", 999)
-            if connection_time < 75:
-                airport = layover.get("airport", "hub")
-                tradeoffs.append(f"Tight {connection_time}min connection in {airport}")
-            
-            # Very long layover
-            layover_duration = layover.get("duration_minutes", 0)
-            if layover_duration > 240:  # >4 hours
-                layover_hours = layover_duration // 60
-                airport = layover.get("airport", "hub")
-                tradeoffs.append(f"Long {layover_hours}h layover in {airport}")
-        
-        # ========================================
-        # RULE 4: Airport Distance
-        # ========================================
-        
-        if dep_distance > 40:
-            tradeoffs.append(f"Departs from airport {int(dep_distance)}km from city center")
-        
-        if arr_distance > 40:
-            tradeoffs.append(f"Arrives at airport {int(arr_distance)}km from city center")
-        
-        # ========================================
-        # RULE 5: Baggage Not Included
-        # ========================================
-        
-        if not baggage:
-            tradeoffs.append("Checked baggage not included in price")
-        
-        # ========================================
-        # RULE 6: Low Airline Rating
-        # ========================================
-        
-        if rating < 3.5 and rating > 0:
-            tradeoffs.append("Budget airline with basic service")
-        
-        # ========================================
-        # RULE 7: Inconvenient Timing
-        # ========================================
-        
-        try:
-            # Parse times
-            if "T" in departure_time:
-                dep_hour = int(departure_time.split("T")[1][:2])
+            # Minimum Connection Time Warning (< 60 mins is risky in big hubs)
+            if dur < 60:
+                tradeoffs.append(f"⚠️ Risky short connection in {loc} ({dur}m)")
+            elif dur > 300:
+                tradeoffs.append(f"Long layover in {loc} ({dur//60}h)")
                 
-                if dep_hour < 6:
-                    tradeoffs.append("Very early departure (before 6 AM)")
-                elif dep_hour >= 22:
+        # 3. Red-Eye Flights
+        if "T" in dep_time:
+            try:
+                hour = int(dep_time.split("T")[1][:2])
+                if hour < 6:
+                    tradeoffs.append("Early morning departure")
+                elif hour >= 22:
                     tradeoffs.append("Late night departure")
-            
-            if "T" in arrival_time:
-                arr_hour = int(arrival_time.split("T")[1][:2])
+            except:
+                pass
                 
-                if arr_hour >= 23 or arr_hour < 5:
-                    tradeoffs.append("Arrives late at night or very early morning")
-        
-        except:
-            # Time parsing failed - skip timing tradeoffs
-            pass
-        
-        # Return max 4 tradeoffs (most important ones)
-        return tradeoffs[:4]
+        return tradeoffs[:3]
 
 
 # ============================================================
-# SINGLETON INSTANCE
+# SINGLETON INSTANCE & CONVENIENCE FUNCTIONS
 # ============================================================
 
 template_engine = TemplateEngine()
 
-
-# ============================================================
-# CONVENIENCE FUNCTIONS
-# ============================================================
-
 def generate_question(missing_param: str, state: Dict[str, Any]) -> Dict[str, Any]:
-    """Generate question for missing parameter."""
     return template_engine.generate_question(missing_param, state)
 
-
 def generate_flight_label(flight: Dict[str, Any], rank: int, all_flights: List[Dict[str, Any]]) -> str:
-    """Generate flight label."""
     return template_engine.generate_label(flight, rank, all_flights)
 
-
 def generate_flight_summary(flight: Dict[str, Any]) -> str:
-    """Generate flight summary."""
     return template_engine.generate_summary(flight)
 
-
 def generate_flight_tradeoffs(flight: Dict[str, Any], all_flights: List[Dict[str, Any]]) -> List[str]:
-    """Generate flight tradeoffs."""
     return template_engine.generate_tradeoffs(flight, all_flights)

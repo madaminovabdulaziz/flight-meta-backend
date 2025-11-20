@@ -1,0 +1,1964 @@
+
+======================================================================
+ AI TRIP PLANNER - COMPREHENSIVE TEST SUITE
+======================================================================
+ Start Time: 2025-11-20 12:31:46
+======================================================================
+
+======================================================================
+  🧪 Unit Tests - Core Components
+======================================================================
+
+============================= test session starts ==============================
+platform darwin -- Python 3.11.1, pytest-9.0.1, pluggy-1.6.0 -- /Users/abdulazizmadaminov/Desktop/FlightAggregator/venv/bin/python
+cachedir: .pytest_cache
+rootdir: /Users/abdulazizmadaminov/Desktop/FlightAggregator 2
+plugins: anyio-4.11.0, langsmith-0.4.43, cov-7.0.0
+collecting ... collected 102 items / 63 deselected / 39 selected
+
+tests/test_unit_components.py::TestIntentClassifier::test_destination_intent PASSED [  2%]
+tests/test_unit_components.py::TestIntentClassifier::test_route_intent PASSED [  5%]
+tests/test_unit_components.py::TestIntentClassifier::test_irrelevant_queries FAILED [  7%]
+tests/test_unit_components.py::TestIntentClassifier::test_airport_code_detection PASSED [ 10%]
+tests/test_unit_components.py::TestIntentClassifier::test_confidence_threshold PASSED [ 12%]
+tests/test_unit_components.py::TestRuleBasedExtractor::test_extract_destination FAILED [ 15%]
+tests/test_unit_components.py::TestRuleBasedExtractor::test_extract_route FAILED [ 17%]
+tests/test_unit_components.py::TestRuleBasedExtractor::test_extract_passengers PASSED [ 20%]
+tests/test_unit_components.py::TestRuleBasedExtractor::test_extract_travel_class PASSED [ 23%]
+tests/test_unit_components.py::TestRuleBasedExtractor::test_context_extraction PASSED [ 25%]
+tests/test_unit_components.py::TestTemplateEngine::test_generate_destination_question PASSED [ 28%]
+tests/test_unit_components.py::TestTemplateEngine::test_generate_date_question PASSED [ 30%]
+tests/test_unit_components.py::TestTemplateEngine::test_generate_flight_label PASSED [ 33%]
+tests/test_unit_components.py::TestTemplateEngine::test_generate_flight_summary PASSED [ 35%]
+tests/test_unit_components.py::TestTemplateEngine::test_generate_tradeoffs PASSED [ 38%]
+tests/test_unit_components.py::TestCheapRanker::test_rank_flights_basic PASSED [ 41%]
+tests/test_unit_components.py::TestCheapRanker::test_rank_scores_present PASSED [ 43%]
+tests/test_unit_components.py::TestCheapRanker::test_cheapest_ranks_high PASSED [ 46%]
+tests/test_unit_components.py::TestCheapRanker::test_direct_flights_ranked_well PASSED [ 48%]
+tests/test_unit_components.py::TestSlotValidation::test_validate_empty_state PASSED [ 51%]
+tests/test_unit_components.py::TestSlotValidation::test_validate_partial_state PASSED [ 53%]
+tests/test_unit_components.py::TestSlotValidation::test_validate_complete_state PASSED [ 56%]
+tests/test_unit_components.py::TestSlotValidation::test_is_ready_for_search PASSED [ 58%]
+tests/test_unit_components.py::TestStateManagement::test_state_creation PASSED [ 61%]
+tests/test_unit_components.py::TestStateManagement::test_state_to_dict PASSED [ 64%]
+tests/test_unit_components.py::TestStateManagement::test_state_update PASSED [ 66%]
+tests/test_unit_components.py::TestStateManagement::test_state_immutability_of_fields PASSED [ 69%]
+tests/test_unit_components.py::test_intent_classification_parametrized[I want to fly to Istanbul-destination_provided] PASSED [ 71%]
+tests/test_unit_components.py::test_intent_classification_parametrized[From London-origin_provided] FAILED [ 74%]
+tests/test_unit_components.py::test_intent_classification_parametrized[December 25th-date_provided] PASSED [ 76%]
+tests/test_unit_components.py::test_intent_classification_parametrized[2 passengers-preference_provided] PASSED [ 79%]
+tests/test_unit_components.py::test_intent_classification_parametrized[Tell me a joke-irrelevant] PASSED [ 82%]
+tests/test_unit_components.py::test_intent_classification_parametrized[Hi-chitchat] PASSED [ 84%]
+tests/test_unit_components.py::test_extraction_parametrized[To Istanbul from London-should_extract0] PASSED [ 87%]
+tests/test_unit_components.py::test_extraction_parametrized[December 25th, 2 passengers-should_extract1] PASSED [ 89%]
+tests/test_unit_components.py::test_extraction_parametrized[Business class-should_extract2] PASSED [ 92%]
+tests/test_unit_components.py::test_extraction_parametrized[IST-should_extract3] FAILED [ 94%]
+tests/test_unit_components.py::test_performance_intent_classification PASSED [ 97%]
+tests/test_unit_components.py::test_performance_extraction FAILED        [100%]
+
+=================================== FAILURES ===================================
+_________________ TestIntentClassifier.test_irrelevant_queries _________________
+tests/test_unit_components.py:81: in test_irrelevant_queries
+    assert intent in ["irrelevant", "chitchat"], \
+E   AssertionError: Failed to classify irrelevant: What's the weather today?
+E   assert 'date_provided' in ['irrelevant', 'chitchat']
+_______________ TestRuleBasedExtractor.test_extract_destination ________________
+tests/test_unit_components.py:122: in test_extract_destination
+    assert expected.lower() in str(extracted["destination"]).lower(), \
+E   AssertionError: Wrong destination extracted from: To Istanbul
+E   assert 'istanbul' in 'ist'
+E    +  where 'istanbul' = <built-in method lower of str object at 0x1039debf0>()
+E    +    where <built-in method lower of str object at 0x1039debf0> = 'Istanbul'.lower
+E    +  and   'ist' = <built-in method lower of str object at 0x1039dec30>()
+E    +    where <built-in method lower of str object at 0x1039dec30> = 'IST'.lower
+E    +      where 'IST' = str('IST')
+__________________ TestRuleBasedExtractor.test_extract_route ___________________
+tests/test_unit_components.py:141: in test_extract_route
+    assert expected_origin.lower() in str(extracted["origin"]).lower()
+E   AssertionError: assert 'london' in 'lhr'
+E    +  where 'london' = <built-in method lower of str object at 0x1039decf0>()
+E    +    where <built-in method lower of str object at 0x1039decf0> = 'London'.lower
+E    +  and   'lhr' = <built-in method lower of str object at 0x1039de930>()
+E    +    where <built-in method lower of str object at 0x1039de930> = 'LHR'.lower
+E    +      where 'LHR' = str('LHR')
+_____ test_intent_classification_parametrized[From London-origin_provided] _____
+tests/test_unit_components.py:457: in test_intent_classification_parametrized
+    assert intent == expected_intent or conf < 0.85, \
+E   AssertionError: Expected origin_provided for 'From London', got destination_provided (conf: 0.9)
+E   assert ('destination_provided' == 'origin_provided'
+E     
+E     - origin_provided
+E     + destination_provided or 0.9 < 0.85)
+______________ test_extraction_parametrized[IST-should_extract3] _______________
+tests/test_unit_components.py:473: in test_extraction_parametrized
+    assert expected_field in extracted, \
+E   AssertionError: Failed to extract destination from: IST
+E   assert 'destination' in {}
+_________________________ test_performance_extraction __________________________
+tests/test_unit_components.py:512: in test_performance_extraction
+    assert avg_ms < 15, f"Extraction too slow: {avg_ms:.2f}ms"
+E   AssertionError: Extraction too slow: 56.63ms
+E   assert 56.625657611423065 < 15
+----------------------------- Captured stdout call -----------------------------
+
+⚡ Rule extraction: 56.63ms avg
+=============================== warnings summary ===============================
+../FlightAggregator/venv/lib/python3.11/site-packages/pydantic/_internal/_config.py:323
+../FlightAggregator/venv/lib/python3.11/site-packages/pydantic/_internal/_config.py:323
+../FlightAggregator/venv/lib/python3.11/site-packages/pydantic/_internal/_config.py:323
+../FlightAggregator/venv/lib/python3.11/site-packages/pydantic/_internal/_config.py:323
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator/venv/lib/python3.11/site-packages/pydantic/_internal/_config.py:323: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.11/migration/
+    warnings.warn(DEPRECATION_MESSAGE, DeprecationWarning)
+
+../FlightAggregator/venv/lib/python3.11/site-packages/passlib/utils/__init__.py:854
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator/venv/lib/python3.11/site-packages/passlib/utils/__init__.py:854: DeprecationWarning: 'crypt' is deprecated and slated for removal in Python 3.13
+    from crypt import crypt as _crypt
+
+app/api/v1/endpoints/nearest_airport.py:30
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/app/api/v1/endpoints/nearest_airport.py:30: DeprecationWarning: `regex` has been deprecated, please use `pattern` instead
+    lang: str = Query("en", regex="^(en|ru|uz)$")
+
+app/api/v1/endpoints/nearest_airport.py:94
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/app/api/v1/endpoints/nearest_airport.py:94: DeprecationWarning: `regex` has been deprecated, please use `pattern` instead
+    lang: str = Query("en", regex="^(en|ru|uz)$")
+
+../FlightAggregator/venv/lib/python3.11/site-packages/pydantic/fields.py:1093: 10 warnings
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator/venv/lib/python3.11/site-packages/pydantic/fields.py:1093: PydanticDeprecatedSince20: Using extra keyword arguments on `Field` is deprecated and will be removed. Use `json_schema_extra` instead. (Extra keys: 'example'). Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.11/migration/
+    warn(
+
+app/api/v1/endpoints/airports.py:97
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/app/api/v1/endpoints/airports.py:97: DeprecationWarning: `example` has been deprecated, please use `examples` instead
+    iata_code: str = Path(
+
+../FlightAggregator/venv/lib/python3.11/site-packages/pydantic/fields.py:1062
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator/venv/lib/python3.11/site-packages/pydantic/fields.py:1062: PydanticDeprecatedSince20: `min_items` is deprecated and will be removed, use `min_length` instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.11/migration/
+    warn('`min_items` is deprecated and will be removed, use `min_length` instead', DeprecationWarning)
+
+../FlightAggregator/venv/lib/python3.11/site-packages/pydantic/fields.py:1068
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator/venv/lib/python3.11/site-packages/pydantic/fields.py:1068: PydanticDeprecatedSince20: `max_items` is deprecated and will be removed, use `max_length` instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.11/migration/
+    warn('`max_items` is deprecated and will be removed, use `max_length` instead', DeprecationWarning)
+
+app/api/v1/endpoints/duffel_flexible.py:205
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/app/api/v1/endpoints/duffel_flexible.py:205: PydanticDeprecatedSince20: Pydantic V1 style `@validator` validators are deprecated. You should migrate to Pydantic V2 style `@field_validator` validators, see the migration guide for more details. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.11/migration/
+    @validator('origin', 'destination')
+
+app/api/v1/endpoints/duffel_flexible.py:210
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/app/api/v1/endpoints/duffel_flexible.py:210: PydanticDeprecatedSince20: Pydantic V1 style `@validator` validators are deprecated. You should migrate to Pydantic V2 style `@field_validator` validators, see the migration guide for more details. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.11/migration/
+    @validator('earliest_departure', 'latest_departure')
+
+app/api/v1/endpoints/duffel_flexible.py:217
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/app/api/v1/endpoints/duffel_flexible.py:217: PydanticDeprecatedSince20: Pydantic V1 style `@validator` validators are deprecated. You should migrate to Pydantic V2 style `@field_validator` validators, see the migration guide for more details. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.11/migration/
+    @validator('latest_departure')
+
+tests/test_chat_endpoint.py:27
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_chat_endpoint.py:27: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_chat_endpoint.py:59
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_chat_endpoint.py:59: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_chat_endpoint.py:94
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_chat_endpoint.py:94: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_chat_endpoint.py:120
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_chat_endpoint.py:120: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_chat_endpoint.py:163
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_chat_endpoint.py:163: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_chat_endpoint.py:178
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_chat_endpoint.py:178: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_chat_endpoint.py:195
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_chat_endpoint.py:195: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_chat_endpoint.py:218
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_chat_endpoint.py:218: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_chat_endpoint.py:234
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_chat_endpoint.py:234: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_chat_endpoint.py:249
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_chat_endpoint.py:249: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_chat_endpoint.py:279
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_chat_endpoint.py:279: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_chat_endpoint.py:289
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_chat_endpoint.py:289: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_chat_endpoint.py:313
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_chat_endpoint.py:313: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_chat_endpoint.py:326
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_chat_endpoint.py:326: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_chat_endpoint.py:376
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_chat_endpoint.py:376: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_chat_endpoint.py:405
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_chat_endpoint.py:405: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_chat_endpoint.py:433
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_chat_endpoint.py:433: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_chat_endpoint.py:456
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_chat_endpoint.py:456: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_hybrid_routing.py:95
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_hybrid_routing.py:95: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_hybrid_routing.py:126
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_hybrid_routing.py:126: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_hybrid_routing.py:150
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_hybrid_routing.py:150: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_hybrid_routing.py:167
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_hybrid_routing.py:167: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_hybrid_routing.py:198
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_hybrid_routing.py:198: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_hybrid_routing.py:235
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_hybrid_routing.py:235: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_hybrid_routing.py:261
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_hybrid_routing.py:261: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_hybrid_routing.py:287
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_hybrid_routing.py:287: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_hybrid_routing.py:308
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_hybrid_routing.py:308: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_hybrid_routing.py:352
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_hybrid_routing.py:352: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_hybrid_routing.py:376
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_hybrid_routing.py:376: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_hybrid_routing.py:404
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_hybrid_routing.py:404: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_mad_libs_ui.py:32
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_mad_libs_ui.py:32: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_mad_libs_ui.py:118
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_mad_libs_ui.py:118: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_mad_libs_ui.py:147
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_mad_libs_ui.py:147: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_mad_libs_ui.py:200
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_mad_libs_ui.py:200: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_mad_libs_ui.py:234
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_mad_libs_ui.py:234: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_mad_libs_ui.py:272
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_mad_libs_ui.py:272: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_mad_libs_ui.py:320
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_mad_libs_ui.py:320: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_mad_libs_ui.py:374
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_mad_libs_ui.py:374: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_mad_libs_ui.py:405
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_mad_libs_ui.py:405: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_mad_libs_ui.py:443
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_mad_libs_ui.py:443: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_mad_libs_ui.py:473
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_mad_libs_ui.py:473: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_mad_libs_ui.py:503
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_mad_libs_ui.py:503: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_mad_libs_ui.py:535
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_mad_libs_ui.py:535: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_mad_libs_ui.py:563
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_mad_libs_ui.py:563: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_multi_turn_persistence.py:22
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_multi_turn_persistence.py:22: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_multi_turn_persistence.py:65
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_multi_turn_persistence.py:65: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_multi_turn_persistence.py:93
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_multi_turn_persistence.py:93: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_multi_turn_persistence.py:120
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_multi_turn_persistence.py:120: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_multi_turn_persistence.py:137
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_multi_turn_persistence.py:137: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_multi_turn_persistence.py:169
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_multi_turn_persistence.py:169: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_multi_turn_persistence.py:194
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_multi_turn_persistence.py:194: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_multi_turn_persistence.py:220
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_multi_turn_persistence.py:220: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_multi_turn_persistence.py:245
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_multi_turn_persistence.py:245: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_multi_turn_persistence.py:264
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_multi_turn_persistence.py:264: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_multi_turn_persistence.py:293
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_multi_turn_persistence.py:293: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_multi_turn_persistence.py:315
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_multi_turn_persistence.py:315: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_multi_turn_persistence.py:337
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_multi_turn_persistence.py:337: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_multi_turn_persistence.py:374
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_multi_turn_persistence.py:374: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_multi_turn_persistence.py:395
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_multi_turn_persistence.py:395: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_multi_turn_persistence.py:414
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_multi_turn_persistence.py:414: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_unit_components.py::TestIntentClassifier::test_irrelevant_queries
+FAILED tests/test_unit_components.py::TestRuleBasedExtractor::test_extract_destination
+FAILED tests/test_unit_components.py::TestRuleBasedExtractor::test_extract_route
+FAILED tests/test_unit_components.py::test_intent_classification_parametrized[From London-origin_provided]
+FAILED tests/test_unit_components.py::test_extraction_parametrized[IST-should_extract3]
+FAILED tests/test_unit_components.py::test_performance_extraction - Assertion...
+=========== 6 failed, 33 passed, 63 deselected, 83 warnings in 7.51s ===========
+
+
+
+======================================================================
+  🔗 Integration Tests - Node Interactions
+======================================================================
+
+============================= test session starts ==============================
+platform darwin -- Python 3.11.1, pytest-9.0.1, pluggy-1.6.0 -- /Users/abdulazizmadaminov/Desktop/FlightAggregator/venv/bin/python
+cachedir: .pytest_cache
+rootdir: /Users/abdulazizmadaminov/Desktop/FlightAggregator 2
+plugins: anyio-4.11.0, langsmith-0.4.43, cov-7.0.0
+collecting ... collected 102 items / 100 deselected / 2 selected
+
+tests/test_chat_endpoint.py::TestFlightSearchIntegration::test_complete_flow_to_flight_results ERROR [ 50%]
+tests/test_chat_endpoint.py::TestFlightSearchIntegration::test_error_handling_flight_search_failure ERROR [100%]
+
+==================================== ERRORS ====================================
+_ ERROR at setup of TestFlightSearchIntegration.test_complete_flow_to_flight_results _
+../FlightAggregator/venv/lib/python3.11/site-packages/_pytest/runner.py:353: in from_call
+    result: TResult | None = func()
+                             ^^^^^^
+../FlightAggregator/venv/lib/python3.11/site-packages/_pytest/runner.py:245: in <lambda>
+    lambda: runtest_hook(item=item, **kwds),
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+../FlightAggregator/venv/lib/python3.11/site-packages/pluggy/_hooks.py:512: in __call__
+    return self._hookexec(self.name, self._hookimpls.copy(), kwargs, firstresult)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+../FlightAggregator/venv/lib/python3.11/site-packages/pluggy/_manager.py:120: in _hookexec
+    return self._inner_hookexec(hook_name, methods, kwargs, firstresult)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+../FlightAggregator/venv/lib/python3.11/site-packages/_pytest/logging.py:843: in pytest_runtest_setup
+    yield
+../FlightAggregator/venv/lib/python3.11/site-packages/_pytest/capture.py:895: in pytest_runtest_setup
+    return (yield)
+            ^^^^^
+../FlightAggregator/venv/lib/python3.11/site-packages/_pytest/runner.py:165: in pytest_runtest_setup
+    item.session._setupstate.setup(item)
+../FlightAggregator/venv/lib/python3.11/site-packages/_pytest/runner.py:523: in setup
+    col.setup()
+../FlightAggregator/venv/lib/python3.11/site-packages/_pytest/python.py:1723: in setup
+    self._request._fillfixtures()
+../FlightAggregator/venv/lib/python3.11/site-packages/_pytest/fixtures.py:707: in _fillfixtures
+    item.funcargs[argname] = self.getfixturevalue(argname)
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+../FlightAggregator/venv/lib/python3.11/site-packages/_pytest/fixtures.py:539: in getfixturevalue
+    fixturedef = self._get_active_fixturedef(argname)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+../FlightAggregator/venv/lib/python3.11/site-packages/_pytest/fixtures.py:627: in _get_active_fixturedef
+    fixturedef.execute(request=subrequest)
+../FlightAggregator/venv/lib/python3.11/site-packages/_pytest/fixtures.py:1110: in execute
+    result: FixtureValue = ihook.pytest_fixture_setup(
+../FlightAggregator/venv/lib/python3.11/site-packages/pluggy/_hooks.py:512: in __call__
+    return self._hookexec(self.name, self._hookimpls.copy(), kwargs, firstresult)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+../FlightAggregator/venv/lib/python3.11/site-packages/pluggy/_manager.py:120: in _hookexec
+    return self._inner_hookexec(hook_name, methods, kwargs, firstresult)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+../FlightAggregator/venv/lib/python3.11/site-packages/pluggy/_callers.py:53: in run_old_style_hookwrapper
+    return result.get_result()
+           ^^^^^^^^^^^^^^^^^^^
+../FlightAggregator/venv/lib/python3.11/site-packages/pluggy/_callers.py:38: in run_old_style_hookwrapper
+    res = yield
+          ^^^^^
+../FlightAggregator/venv/lib/python3.11/site-packages/_pytest/setuponly.py:36: in pytest_fixture_setup
+    return (yield)
+            ^^^^^
+../FlightAggregator/venv/lib/python3.11/site-packages/_pytest/fixtures.py:1188: in pytest_fixture_setup
+    warnings.warn(
+E   pytest.PytestRemovedIn9Warning: '' requested an async fixture 'test_engine', with no plugin or hook that handled it. This is usually an error, as pytest does not natively support it. This will turn into an error in pytest 9.
+E   See: https://docs.pytest.org/en/stable/deprecations.html#sync-test-depending-on-async-fixture
+_ ERROR at setup of TestFlightSearchIntegration.test_error_handling_flight_search_failure _
+../FlightAggregator/venv/lib/python3.11/site-packages/_pytest/runner.py:353: in from_call
+    result: TResult | None = func()
+                             ^^^^^^
+../FlightAggregator/venv/lib/python3.11/site-packages/_pytest/runner.py:245: in <lambda>
+    lambda: runtest_hook(item=item, **kwds),
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+../FlightAggregator/venv/lib/python3.11/site-packages/pluggy/_hooks.py:512: in __call__
+    return self._hookexec(self.name, self._hookimpls.copy(), kwargs, firstresult)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+../FlightAggregator/venv/lib/python3.11/site-packages/pluggy/_manager.py:120: in _hookexec
+    return self._inner_hookexec(hook_name, methods, kwargs, firstresult)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+../FlightAggregator/venv/lib/python3.11/site-packages/_pytest/logging.py:843: in pytest_runtest_setup
+    yield
+../FlightAggregator/venv/lib/python3.11/site-packages/_pytest/capture.py:895: in pytest_runtest_setup
+    return (yield)
+            ^^^^^
+../FlightAggregator/venv/lib/python3.11/site-packages/_pytest/runner.py:165: in pytest_runtest_setup
+    item.session._setupstate.setup(item)
+../FlightAggregator/venv/lib/python3.11/site-packages/_pytest/runner.py:523: in setup
+    col.setup()
+../FlightAggregator/venv/lib/python3.11/site-packages/_pytest/python.py:1723: in setup
+    self._request._fillfixtures()
+../FlightAggregator/venv/lib/python3.11/site-packages/_pytest/fixtures.py:707: in _fillfixtures
+    item.funcargs[argname] = self.getfixturevalue(argname)
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+../FlightAggregator/venv/lib/python3.11/site-packages/_pytest/fixtures.py:539: in getfixturevalue
+    fixturedef = self._get_active_fixturedef(argname)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+../FlightAggregator/venv/lib/python3.11/site-packages/_pytest/fixtures.py:627: in _get_active_fixturedef
+    fixturedef.execute(request=subrequest)
+../FlightAggregator/venv/lib/python3.11/site-packages/_pytest/fixtures.py:1110: in execute
+    result: FixtureValue = ihook.pytest_fixture_setup(
+../FlightAggregator/venv/lib/python3.11/site-packages/pluggy/_hooks.py:512: in __call__
+    return self._hookexec(self.name, self._hookimpls.copy(), kwargs, firstresult)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+../FlightAggregator/venv/lib/python3.11/site-packages/pluggy/_manager.py:120: in _hookexec
+    return self._inner_hookexec(hook_name, methods, kwargs, firstresult)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+../FlightAggregator/venv/lib/python3.11/site-packages/pluggy/_callers.py:53: in run_old_style_hookwrapper
+    return result.get_result()
+           ^^^^^^^^^^^^^^^^^^^
+../FlightAggregator/venv/lib/python3.11/site-packages/pluggy/_callers.py:38: in run_old_style_hookwrapper
+    res = yield
+          ^^^^^
+../FlightAggregator/venv/lib/python3.11/site-packages/_pytest/setuponly.py:36: in pytest_fixture_setup
+    return (yield)
+            ^^^^^
+../FlightAggregator/venv/lib/python3.11/site-packages/_pytest/fixtures.py:1188: in pytest_fixture_setup
+    warnings.warn(
+E   pytest.PytestRemovedIn9Warning: '' requested an async fixture 'test_engine', with no plugin or hook that handled it. This is usually an error, as pytest does not natively support it. This will turn into an error in pytest 9.
+E   See: https://docs.pytest.org/en/stable/deprecations.html#sync-test-depending-on-async-fixture
+=============================== warnings summary ===============================
+../FlightAggregator/venv/lib/python3.11/site-packages/pydantic/_internal/_config.py:323
+../FlightAggregator/venv/lib/python3.11/site-packages/pydantic/_internal/_config.py:323
+../FlightAggregator/venv/lib/python3.11/site-packages/pydantic/_internal/_config.py:323
+../FlightAggregator/venv/lib/python3.11/site-packages/pydantic/_internal/_config.py:323
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator/venv/lib/python3.11/site-packages/pydantic/_internal/_config.py:323: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.11/migration/
+    warnings.warn(DEPRECATION_MESSAGE, DeprecationWarning)
+
+../FlightAggregator/venv/lib/python3.11/site-packages/passlib/utils/__init__.py:854
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator/venv/lib/python3.11/site-packages/passlib/utils/__init__.py:854: DeprecationWarning: 'crypt' is deprecated and slated for removal in Python 3.13
+    from crypt import crypt as _crypt
+
+app/api/v1/endpoints/nearest_airport.py:30
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/app/api/v1/endpoints/nearest_airport.py:30: DeprecationWarning: `regex` has been deprecated, please use `pattern` instead
+    lang: str = Query("en", regex="^(en|ru|uz)$")
+
+app/api/v1/endpoints/nearest_airport.py:94
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/app/api/v1/endpoints/nearest_airport.py:94: DeprecationWarning: `regex` has been deprecated, please use `pattern` instead
+    lang: str = Query("en", regex="^(en|ru|uz)$")
+
+../FlightAggregator/venv/lib/python3.11/site-packages/pydantic/fields.py:1093: 10 warnings
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator/venv/lib/python3.11/site-packages/pydantic/fields.py:1093: PydanticDeprecatedSince20: Using extra keyword arguments on `Field` is deprecated and will be removed. Use `json_schema_extra` instead. (Extra keys: 'example'). Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.11/migration/
+    warn(
+
+app/api/v1/endpoints/airports.py:97
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/app/api/v1/endpoints/airports.py:97: DeprecationWarning: `example` has been deprecated, please use `examples` instead
+    iata_code: str = Path(
+
+../FlightAggregator/venv/lib/python3.11/site-packages/pydantic/fields.py:1062
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator/venv/lib/python3.11/site-packages/pydantic/fields.py:1062: PydanticDeprecatedSince20: `min_items` is deprecated and will be removed, use `min_length` instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.11/migration/
+    warn('`min_items` is deprecated and will be removed, use `min_length` instead', DeprecationWarning)
+
+../FlightAggregator/venv/lib/python3.11/site-packages/pydantic/fields.py:1068
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator/venv/lib/python3.11/site-packages/pydantic/fields.py:1068: PydanticDeprecatedSince20: `max_items` is deprecated and will be removed, use `max_length` instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.11/migration/
+    warn('`max_items` is deprecated and will be removed, use `max_length` instead', DeprecationWarning)
+
+app/api/v1/endpoints/duffel_flexible.py:205
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/app/api/v1/endpoints/duffel_flexible.py:205: PydanticDeprecatedSince20: Pydantic V1 style `@validator` validators are deprecated. You should migrate to Pydantic V2 style `@field_validator` validators, see the migration guide for more details. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.11/migration/
+    @validator('origin', 'destination')
+
+app/api/v1/endpoints/duffel_flexible.py:210
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/app/api/v1/endpoints/duffel_flexible.py:210: PydanticDeprecatedSince20: Pydantic V1 style `@validator` validators are deprecated. You should migrate to Pydantic V2 style `@field_validator` validators, see the migration guide for more details. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.11/migration/
+    @validator('earliest_departure', 'latest_departure')
+
+app/api/v1/endpoints/duffel_flexible.py:217
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/app/api/v1/endpoints/duffel_flexible.py:217: PydanticDeprecatedSince20: Pydantic V1 style `@validator` validators are deprecated. You should migrate to Pydantic V2 style `@field_validator` validators, see the migration guide for more details. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.11/migration/
+    @validator('latest_departure')
+
+tests/test_chat_endpoint.py:27
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_chat_endpoint.py:27: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_chat_endpoint.py:59
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_chat_endpoint.py:59: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_chat_endpoint.py:94
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_chat_endpoint.py:94: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_chat_endpoint.py:120
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_chat_endpoint.py:120: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_chat_endpoint.py:163
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_chat_endpoint.py:163: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_chat_endpoint.py:178
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_chat_endpoint.py:178: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_chat_endpoint.py:195
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_chat_endpoint.py:195: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_chat_endpoint.py:218
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_chat_endpoint.py:218: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_chat_endpoint.py:234
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_chat_endpoint.py:234: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_chat_endpoint.py:249
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_chat_endpoint.py:249: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_chat_endpoint.py:279
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_chat_endpoint.py:279: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_chat_endpoint.py:289
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_chat_endpoint.py:289: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_chat_endpoint.py:313
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_chat_endpoint.py:313: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_chat_endpoint.py:326
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_chat_endpoint.py:326: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_chat_endpoint.py:376
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_chat_endpoint.py:376: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_chat_endpoint.py:405
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_chat_endpoint.py:405: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_chat_endpoint.py:433
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_chat_endpoint.py:433: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_chat_endpoint.py:456
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_chat_endpoint.py:456: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_hybrid_routing.py:95
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_hybrid_routing.py:95: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_hybrid_routing.py:126
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_hybrid_routing.py:126: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_hybrid_routing.py:150
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_hybrid_routing.py:150: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_hybrid_routing.py:167
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_hybrid_routing.py:167: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_hybrid_routing.py:198
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_hybrid_routing.py:198: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_hybrid_routing.py:235
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_hybrid_routing.py:235: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_hybrid_routing.py:261
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_hybrid_routing.py:261: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_hybrid_routing.py:287
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_hybrid_routing.py:287: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_hybrid_routing.py:308
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_hybrid_routing.py:308: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_hybrid_routing.py:352
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_hybrid_routing.py:352: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_hybrid_routing.py:376
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_hybrid_routing.py:376: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_hybrid_routing.py:404
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_hybrid_routing.py:404: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_mad_libs_ui.py:32
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_mad_libs_ui.py:32: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_mad_libs_ui.py:118
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_mad_libs_ui.py:118: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_mad_libs_ui.py:147
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_mad_libs_ui.py:147: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_mad_libs_ui.py:200
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_mad_libs_ui.py:200: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_mad_libs_ui.py:234
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_mad_libs_ui.py:234: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_mad_libs_ui.py:272
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_mad_libs_ui.py:272: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_mad_libs_ui.py:320
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_mad_libs_ui.py:320: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_mad_libs_ui.py:374
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_mad_libs_ui.py:374: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_mad_libs_ui.py:405
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_mad_libs_ui.py:405: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_mad_libs_ui.py:443
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_mad_libs_ui.py:443: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_mad_libs_ui.py:473
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_mad_libs_ui.py:473: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_mad_libs_ui.py:503
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_mad_libs_ui.py:503: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_mad_libs_ui.py:535
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_mad_libs_ui.py:535: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_mad_libs_ui.py:563
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_mad_libs_ui.py:563: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_multi_turn_persistence.py:22
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_multi_turn_persistence.py:22: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_multi_turn_persistence.py:65
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_multi_turn_persistence.py:65: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_multi_turn_persistence.py:93
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_multi_turn_persistence.py:93: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_multi_turn_persistence.py:120
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_multi_turn_persistence.py:120: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_multi_turn_persistence.py:137
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_multi_turn_persistence.py:137: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_multi_turn_persistence.py:169
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_multi_turn_persistence.py:169: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_multi_turn_persistence.py:194
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_multi_turn_persistence.py:194: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_multi_turn_persistence.py:220
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_multi_turn_persistence.py:220: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_multi_turn_persistence.py:245
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_multi_turn_persistence.py:245: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_multi_turn_persistence.py:264
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_multi_turn_persistence.py:264: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_multi_turn_persistence.py:293
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_multi_turn_persistence.py:293: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_multi_turn_persistence.py:315
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_multi_turn_persistence.py:315: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_multi_turn_persistence.py:337
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_multi_turn_persistence.py:337: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_multi_turn_persistence.py:374
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_multi_turn_persistence.py:374: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_multi_turn_persistence.py:395
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_multi_turn_persistence.py:395: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_multi_turn_persistence.py:414
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_multi_turn_persistence.py:414: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+ERROR tests/test_chat_endpoint.py::TestFlightSearchIntegration::test_complete_flow_to_flight_results
+ERROR tests/test_chat_endpoint.py::TestFlightSearchIntegration::test_error_handling_flight_search_failure
+================ 100 deselected, 83 warnings, 2 errors in 0.49s ================
+
+
+
+======================================================================
+  🎯 End-to-End Tests
+======================================================================
+
+============================= test session starts ==============================
+platform darwin -- Python 3.11.1, pytest-9.0.1, pluggy-1.6.0 -- /Users/abdulazizmadaminov/Desktop/FlightAggregator/venv/bin/python
+cachedir: .pytest_cache
+rootdir: /Users/abdulazizmadaminov/Desktop/FlightAggregator 2
+plugins: anyio-4.11.0, langsmith-0.4.43, cov-7.0.0
+collecting ... collected 102 items / 102 deselected / 0 selected
+
+=============================== warnings summary ===============================
+../FlightAggregator/venv/lib/python3.11/site-packages/pydantic/_internal/_config.py:323
+../FlightAggregator/venv/lib/python3.11/site-packages/pydantic/_internal/_config.py:323
+../FlightAggregator/venv/lib/python3.11/site-packages/pydantic/_internal/_config.py:323
+../FlightAggregator/venv/lib/python3.11/site-packages/pydantic/_internal/_config.py:323
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator/venv/lib/python3.11/site-packages/pydantic/_internal/_config.py:323: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.11/migration/
+    warnings.warn(DEPRECATION_MESSAGE, DeprecationWarning)
+
+../FlightAggregator/venv/lib/python3.11/site-packages/passlib/utils/__init__.py:854
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator/venv/lib/python3.11/site-packages/passlib/utils/__init__.py:854: DeprecationWarning: 'crypt' is deprecated and slated for removal in Python 3.13
+    from crypt import crypt as _crypt
+
+app/api/v1/endpoints/nearest_airport.py:30
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/app/api/v1/endpoints/nearest_airport.py:30: DeprecationWarning: `regex` has been deprecated, please use `pattern` instead
+    lang: str = Query("en", regex="^(en|ru|uz)$")
+
+app/api/v1/endpoints/nearest_airport.py:94
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/app/api/v1/endpoints/nearest_airport.py:94: DeprecationWarning: `regex` has been deprecated, please use `pattern` instead
+    lang: str = Query("en", regex="^(en|ru|uz)$")
+
+../FlightAggregator/venv/lib/python3.11/site-packages/pydantic/fields.py:1093: 10 warnings
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator/venv/lib/python3.11/site-packages/pydantic/fields.py:1093: PydanticDeprecatedSince20: Using extra keyword arguments on `Field` is deprecated and will be removed. Use `json_schema_extra` instead. (Extra keys: 'example'). Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.11/migration/
+    warn(
+
+app/api/v1/endpoints/airports.py:97
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/app/api/v1/endpoints/airports.py:97: DeprecationWarning: `example` has been deprecated, please use `examples` instead
+    iata_code: str = Path(
+
+../FlightAggregator/venv/lib/python3.11/site-packages/pydantic/fields.py:1062
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator/venv/lib/python3.11/site-packages/pydantic/fields.py:1062: PydanticDeprecatedSince20: `min_items` is deprecated and will be removed, use `min_length` instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.11/migration/
+    warn('`min_items` is deprecated and will be removed, use `min_length` instead', DeprecationWarning)
+
+../FlightAggregator/venv/lib/python3.11/site-packages/pydantic/fields.py:1068
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator/venv/lib/python3.11/site-packages/pydantic/fields.py:1068: PydanticDeprecatedSince20: `max_items` is deprecated and will be removed, use `max_length` instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.11/migration/
+    warn('`max_items` is deprecated and will be removed, use `max_length` instead', DeprecationWarning)
+
+app/api/v1/endpoints/duffel_flexible.py:205
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/app/api/v1/endpoints/duffel_flexible.py:205: PydanticDeprecatedSince20: Pydantic V1 style `@validator` validators are deprecated. You should migrate to Pydantic V2 style `@field_validator` validators, see the migration guide for more details. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.11/migration/
+    @validator('origin', 'destination')
+
+app/api/v1/endpoints/duffel_flexible.py:210
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/app/api/v1/endpoints/duffel_flexible.py:210: PydanticDeprecatedSince20: Pydantic V1 style `@validator` validators are deprecated. You should migrate to Pydantic V2 style `@field_validator` validators, see the migration guide for more details. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.11/migration/
+    @validator('earliest_departure', 'latest_departure')
+
+app/api/v1/endpoints/duffel_flexible.py:217
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/app/api/v1/endpoints/duffel_flexible.py:217: PydanticDeprecatedSince20: Pydantic V1 style `@validator` validators are deprecated. You should migrate to Pydantic V2 style `@field_validator` validators, see the migration guide for more details. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.11/migration/
+    @validator('latest_departure')
+
+tests/test_chat_endpoint.py:27
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_chat_endpoint.py:27: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_chat_endpoint.py:59
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_chat_endpoint.py:59: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_chat_endpoint.py:94
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_chat_endpoint.py:94: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_chat_endpoint.py:120
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_chat_endpoint.py:120: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_chat_endpoint.py:163
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_chat_endpoint.py:163: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_chat_endpoint.py:178
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_chat_endpoint.py:178: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_chat_endpoint.py:195
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_chat_endpoint.py:195: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_chat_endpoint.py:218
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_chat_endpoint.py:218: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_chat_endpoint.py:234
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_chat_endpoint.py:234: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_chat_endpoint.py:249
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_chat_endpoint.py:249: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_chat_endpoint.py:279
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_chat_endpoint.py:279: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_chat_endpoint.py:289
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_chat_endpoint.py:289: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_chat_endpoint.py:313
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_chat_endpoint.py:313: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_chat_endpoint.py:326
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_chat_endpoint.py:326: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_chat_endpoint.py:376
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_chat_endpoint.py:376: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_chat_endpoint.py:405
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_chat_endpoint.py:405: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_chat_endpoint.py:433
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_chat_endpoint.py:433: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_chat_endpoint.py:456
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_chat_endpoint.py:456: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_hybrid_routing.py:95
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_hybrid_routing.py:95: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_hybrid_routing.py:126
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_hybrid_routing.py:126: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_hybrid_routing.py:150
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_hybrid_routing.py:150: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_hybrid_routing.py:167
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_hybrid_routing.py:167: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_hybrid_routing.py:198
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_hybrid_routing.py:198: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_hybrid_routing.py:235
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_hybrid_routing.py:235: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_hybrid_routing.py:261
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_hybrid_routing.py:261: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_hybrid_routing.py:287
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_hybrid_routing.py:287: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_hybrid_routing.py:308
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_hybrid_routing.py:308: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_hybrid_routing.py:352
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_hybrid_routing.py:352: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_hybrid_routing.py:376
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_hybrid_routing.py:376: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_hybrid_routing.py:404
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_hybrid_routing.py:404: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_mad_libs_ui.py:32
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_mad_libs_ui.py:32: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_mad_libs_ui.py:118
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_mad_libs_ui.py:118: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_mad_libs_ui.py:147
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_mad_libs_ui.py:147: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_mad_libs_ui.py:200
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_mad_libs_ui.py:200: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_mad_libs_ui.py:234
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_mad_libs_ui.py:234: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_mad_libs_ui.py:272
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_mad_libs_ui.py:272: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_mad_libs_ui.py:320
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_mad_libs_ui.py:320: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_mad_libs_ui.py:374
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_mad_libs_ui.py:374: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_mad_libs_ui.py:405
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_mad_libs_ui.py:405: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_mad_libs_ui.py:443
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_mad_libs_ui.py:443: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_mad_libs_ui.py:473
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_mad_libs_ui.py:473: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_mad_libs_ui.py:503
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_mad_libs_ui.py:503: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_mad_libs_ui.py:535
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_mad_libs_ui.py:535: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_mad_libs_ui.py:563
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_mad_libs_ui.py:563: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_multi_turn_persistence.py:22
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_multi_turn_persistence.py:22: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_multi_turn_persistence.py:65
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_multi_turn_persistence.py:65: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_multi_turn_persistence.py:93
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_multi_turn_persistence.py:93: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_multi_turn_persistence.py:120
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_multi_turn_persistence.py:120: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_multi_turn_persistence.py:137
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_multi_turn_persistence.py:137: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_multi_turn_persistence.py:169
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_multi_turn_persistence.py:169: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_multi_turn_persistence.py:194
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_multi_turn_persistence.py:194: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_multi_turn_persistence.py:220
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_multi_turn_persistence.py:220: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_multi_turn_persistence.py:245
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_multi_turn_persistence.py:245: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_multi_turn_persistence.py:264
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_multi_turn_persistence.py:264: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_multi_turn_persistence.py:293
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_multi_turn_persistence.py:293: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_multi_turn_persistence.py:315
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_multi_turn_persistence.py:315: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_multi_turn_persistence.py:337
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_multi_turn_persistence.py:337: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_multi_turn_persistence.py:374
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_multi_turn_persistence.py:374: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_multi_turn_persistence.py:395
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_multi_turn_persistence.py:395: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_multi_turn_persistence.py:414
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_multi_turn_persistence.py:414: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+===================== 102 deselected, 83 warnings in 0.03s =====================
+
+
+
+======================================================================
+  🌐 API Tests - FastAPI Endpoints
+======================================================================
+
+============================= test session starts ==============================
+platform darwin -- Python 3.11.1, pytest-9.0.1, pluggy-1.6.0 -- /Users/abdulazizmadaminov/Desktop/FlightAggregator/venv/bin/python
+cachedir: .pytest_cache
+rootdir: /Users/abdulazizmadaminov/Desktop/FlightAggregator 2
+plugins: anyio-4.11.0, langsmith-0.4.43, cov-7.0.0
+collecting ... collected 102 items / 102 deselected / 0 selected
+
+=============================== warnings summary ===============================
+../FlightAggregator/venv/lib/python3.11/site-packages/pydantic/_internal/_config.py:323
+../FlightAggregator/venv/lib/python3.11/site-packages/pydantic/_internal/_config.py:323
+../FlightAggregator/venv/lib/python3.11/site-packages/pydantic/_internal/_config.py:323
+../FlightAggregator/venv/lib/python3.11/site-packages/pydantic/_internal/_config.py:323
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator/venv/lib/python3.11/site-packages/pydantic/_internal/_config.py:323: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.11/migration/
+    warnings.warn(DEPRECATION_MESSAGE, DeprecationWarning)
+
+../FlightAggregator/venv/lib/python3.11/site-packages/passlib/utils/__init__.py:854
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator/venv/lib/python3.11/site-packages/passlib/utils/__init__.py:854: DeprecationWarning: 'crypt' is deprecated and slated for removal in Python 3.13
+    from crypt import crypt as _crypt
+
+app/api/v1/endpoints/nearest_airport.py:30
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/app/api/v1/endpoints/nearest_airport.py:30: DeprecationWarning: `regex` has been deprecated, please use `pattern` instead
+    lang: str = Query("en", regex="^(en|ru|uz)$")
+
+app/api/v1/endpoints/nearest_airport.py:94
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/app/api/v1/endpoints/nearest_airport.py:94: DeprecationWarning: `regex` has been deprecated, please use `pattern` instead
+    lang: str = Query("en", regex="^(en|ru|uz)$")
+
+../FlightAggregator/venv/lib/python3.11/site-packages/pydantic/fields.py:1093: 10 warnings
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator/venv/lib/python3.11/site-packages/pydantic/fields.py:1093: PydanticDeprecatedSince20: Using extra keyword arguments on `Field` is deprecated and will be removed. Use `json_schema_extra` instead. (Extra keys: 'example'). Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.11/migration/
+    warn(
+
+app/api/v1/endpoints/airports.py:97
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/app/api/v1/endpoints/airports.py:97: DeprecationWarning: `example` has been deprecated, please use `examples` instead
+    iata_code: str = Path(
+
+../FlightAggregator/venv/lib/python3.11/site-packages/pydantic/fields.py:1062
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator/venv/lib/python3.11/site-packages/pydantic/fields.py:1062: PydanticDeprecatedSince20: `min_items` is deprecated and will be removed, use `min_length` instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.11/migration/
+    warn('`min_items` is deprecated and will be removed, use `min_length` instead', DeprecationWarning)
+
+../FlightAggregator/venv/lib/python3.11/site-packages/pydantic/fields.py:1068
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator/venv/lib/python3.11/site-packages/pydantic/fields.py:1068: PydanticDeprecatedSince20: `max_items` is deprecated and will be removed, use `max_length` instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.11/migration/
+    warn('`max_items` is deprecated and will be removed, use `max_length` instead', DeprecationWarning)
+
+app/api/v1/endpoints/duffel_flexible.py:205
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/app/api/v1/endpoints/duffel_flexible.py:205: PydanticDeprecatedSince20: Pydantic V1 style `@validator` validators are deprecated. You should migrate to Pydantic V2 style `@field_validator` validators, see the migration guide for more details. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.11/migration/
+    @validator('origin', 'destination')
+
+app/api/v1/endpoints/duffel_flexible.py:210
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/app/api/v1/endpoints/duffel_flexible.py:210: PydanticDeprecatedSince20: Pydantic V1 style `@validator` validators are deprecated. You should migrate to Pydantic V2 style `@field_validator` validators, see the migration guide for more details. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.11/migration/
+    @validator('earliest_departure', 'latest_departure')
+
+app/api/v1/endpoints/duffel_flexible.py:217
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/app/api/v1/endpoints/duffel_flexible.py:217: PydanticDeprecatedSince20: Pydantic V1 style `@validator` validators are deprecated. You should migrate to Pydantic V2 style `@field_validator` validators, see the migration guide for more details. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.11/migration/
+    @validator('latest_departure')
+
+tests/test_chat_endpoint.py:27
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_chat_endpoint.py:27: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_chat_endpoint.py:59
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_chat_endpoint.py:59: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_chat_endpoint.py:94
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_chat_endpoint.py:94: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_chat_endpoint.py:120
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_chat_endpoint.py:120: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_chat_endpoint.py:163
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_chat_endpoint.py:163: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_chat_endpoint.py:178
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_chat_endpoint.py:178: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_chat_endpoint.py:195
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_chat_endpoint.py:195: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_chat_endpoint.py:218
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_chat_endpoint.py:218: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_chat_endpoint.py:234
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_chat_endpoint.py:234: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_chat_endpoint.py:249
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_chat_endpoint.py:249: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_chat_endpoint.py:279
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_chat_endpoint.py:279: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_chat_endpoint.py:289
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_chat_endpoint.py:289: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_chat_endpoint.py:313
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_chat_endpoint.py:313: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_chat_endpoint.py:326
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_chat_endpoint.py:326: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_chat_endpoint.py:376
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_chat_endpoint.py:376: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_chat_endpoint.py:405
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_chat_endpoint.py:405: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_chat_endpoint.py:433
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_chat_endpoint.py:433: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_chat_endpoint.py:456
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_chat_endpoint.py:456: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_hybrid_routing.py:95
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_hybrid_routing.py:95: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_hybrid_routing.py:126
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_hybrid_routing.py:126: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_hybrid_routing.py:150
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_hybrid_routing.py:150: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_hybrid_routing.py:167
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_hybrid_routing.py:167: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_hybrid_routing.py:198
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_hybrid_routing.py:198: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_hybrid_routing.py:235
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_hybrid_routing.py:235: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_hybrid_routing.py:261
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_hybrid_routing.py:261: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_hybrid_routing.py:287
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_hybrid_routing.py:287: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_hybrid_routing.py:308
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_hybrid_routing.py:308: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_hybrid_routing.py:352
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_hybrid_routing.py:352: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_hybrid_routing.py:376
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_hybrid_routing.py:376: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_hybrid_routing.py:404
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_hybrid_routing.py:404: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_mad_libs_ui.py:32
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_mad_libs_ui.py:32: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_mad_libs_ui.py:118
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_mad_libs_ui.py:118: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_mad_libs_ui.py:147
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_mad_libs_ui.py:147: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_mad_libs_ui.py:200
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_mad_libs_ui.py:200: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_mad_libs_ui.py:234
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_mad_libs_ui.py:234: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_mad_libs_ui.py:272
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_mad_libs_ui.py:272: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_mad_libs_ui.py:320
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_mad_libs_ui.py:320: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_mad_libs_ui.py:374
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_mad_libs_ui.py:374: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_mad_libs_ui.py:405
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_mad_libs_ui.py:405: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_mad_libs_ui.py:443
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_mad_libs_ui.py:443: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_mad_libs_ui.py:473
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_mad_libs_ui.py:473: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_mad_libs_ui.py:503
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_mad_libs_ui.py:503: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_mad_libs_ui.py:535
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_mad_libs_ui.py:535: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_mad_libs_ui.py:563
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_mad_libs_ui.py:563: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_multi_turn_persistence.py:22
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_multi_turn_persistence.py:22: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_multi_turn_persistence.py:65
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_multi_turn_persistence.py:65: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_multi_turn_persistence.py:93
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_multi_turn_persistence.py:93: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_multi_turn_persistence.py:120
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_multi_turn_persistence.py:120: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_multi_turn_persistence.py:137
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_multi_turn_persistence.py:137: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_multi_turn_persistence.py:169
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_multi_turn_persistence.py:169: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_multi_turn_persistence.py:194
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_multi_turn_persistence.py:194: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_multi_turn_persistence.py:220
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_multi_turn_persistence.py:220: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_multi_turn_persistence.py:245
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_multi_turn_persistence.py:245: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_multi_turn_persistence.py:264
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_multi_turn_persistence.py:264: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_multi_turn_persistence.py:293
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_multi_turn_persistence.py:293: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_multi_turn_persistence.py:315
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_multi_turn_persistence.py:315: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_multi_turn_persistence.py:337
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_multi_turn_persistence.py:337: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_multi_turn_persistence.py:374
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_multi_turn_persistence.py:374: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_multi_turn_persistence.py:395
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_multi_turn_persistence.py:395: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_multi_turn_persistence.py:414
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_multi_turn_persistence.py:414: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+===================== 102 deselected, 83 warnings in 0.03s =====================
+
+
+
+======================================================================
+  ⚡ Performance Tests
+======================================================================
+
+============================= test session starts ==============================
+platform darwin -- Python 3.11.1, pytest-9.0.1, pluggy-1.6.0 -- /Users/abdulazizmadaminov/Desktop/FlightAggregator/venv/bin/python
+cachedir: .pytest_cache
+rootdir: /Users/abdulazizmadaminov/Desktop/FlightAggregator 2
+plugins: anyio-4.11.0, langsmith-0.4.43, cov-7.0.0
+collecting ... collected 102 items / 94 deselected / 8 selected
+
+tests/test_chat_endpoint.py::TestPerformanceAndLatency::test_response_time_rule_based ERROR [ 12%]
+tests/test_chat_endpoint.py::TestPerformanceAndLatency::test_response_time_llm_path ERROR [ 25%]
+tests/test_chat_endpoint.py::TestPerformanceAndLatency::test_concurrent_requests ERROR [ 37%]
+tests/test_hybrid_routing.py::TestPerformanceDifferences::test_rule_based_is_faster FAILED [ 50%]
+tests/test_hybrid_routing.py::TestPerformanceDifferences::test_cost_savings_rule_based FAILED [ 62%]
+tests/test_mad_libs_ui.py::test_mad_libs_performance_benchmarks FAILED   [ 75%]
+tests/test_unit_components.py::test_performance_intent_classification PASSED [ 87%]
+tests/test_unit_components.py::test_performance_extraction FAILED        [100%]
+
+==================================== ERRORS ====================================
+__ ERROR at setup of TestPerformanceAndLatency.test_response_time_rule_based ___
+../FlightAggregator/venv/lib/python3.11/site-packages/_pytest/runner.py:353: in from_call
+    result: TResult | None = func()
+                             ^^^^^^
+../FlightAggregator/venv/lib/python3.11/site-packages/_pytest/runner.py:245: in <lambda>
+    lambda: runtest_hook(item=item, **kwds),
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+../FlightAggregator/venv/lib/python3.11/site-packages/pluggy/_hooks.py:512: in __call__
+    return self._hookexec(self.name, self._hookimpls.copy(), kwargs, firstresult)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+../FlightAggregator/venv/lib/python3.11/site-packages/pluggy/_manager.py:120: in _hookexec
+    return self._inner_hookexec(hook_name, methods, kwargs, firstresult)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+../FlightAggregator/venv/lib/python3.11/site-packages/_pytest/logging.py:843: in pytest_runtest_setup
+    yield
+../FlightAggregator/venv/lib/python3.11/site-packages/_pytest/capture.py:895: in pytest_runtest_setup
+    return (yield)
+            ^^^^^
+../FlightAggregator/venv/lib/python3.11/site-packages/_pytest/runner.py:165: in pytest_runtest_setup
+    item.session._setupstate.setup(item)
+../FlightAggregator/venv/lib/python3.11/site-packages/_pytest/runner.py:523: in setup
+    col.setup()
+../FlightAggregator/venv/lib/python3.11/site-packages/_pytest/python.py:1723: in setup
+    self._request._fillfixtures()
+../FlightAggregator/venv/lib/python3.11/site-packages/_pytest/fixtures.py:707: in _fillfixtures
+    item.funcargs[argname] = self.getfixturevalue(argname)
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+../FlightAggregator/venv/lib/python3.11/site-packages/_pytest/fixtures.py:539: in getfixturevalue
+    fixturedef = self._get_active_fixturedef(argname)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+../FlightAggregator/venv/lib/python3.11/site-packages/_pytest/fixtures.py:627: in _get_active_fixturedef
+    fixturedef.execute(request=subrequest)
+../FlightAggregator/venv/lib/python3.11/site-packages/_pytest/fixtures.py:1110: in execute
+    result: FixtureValue = ihook.pytest_fixture_setup(
+../FlightAggregator/venv/lib/python3.11/site-packages/pluggy/_hooks.py:512: in __call__
+    return self._hookexec(self.name, self._hookimpls.copy(), kwargs, firstresult)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+../FlightAggregator/venv/lib/python3.11/site-packages/pluggy/_manager.py:120: in _hookexec
+    return self._inner_hookexec(hook_name, methods, kwargs, firstresult)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+../FlightAggregator/venv/lib/python3.11/site-packages/pluggy/_callers.py:53: in run_old_style_hookwrapper
+    return result.get_result()
+           ^^^^^^^^^^^^^^^^^^^
+../FlightAggregator/venv/lib/python3.11/site-packages/pluggy/_callers.py:38: in run_old_style_hookwrapper
+    res = yield
+          ^^^^^
+../FlightAggregator/venv/lib/python3.11/site-packages/_pytest/setuponly.py:36: in pytest_fixture_setup
+    return (yield)
+            ^^^^^
+../FlightAggregator/venv/lib/python3.11/site-packages/_pytest/fixtures.py:1188: in pytest_fixture_setup
+    warnings.warn(
+E   pytest.PytestRemovedIn9Warning: '' requested an async fixture 'test_engine', with no plugin or hook that handled it. This is usually an error, as pytest does not natively support it. This will turn into an error in pytest 9.
+E   See: https://docs.pytest.org/en/stable/deprecations.html#sync-test-depending-on-async-fixture
+___ ERROR at setup of TestPerformanceAndLatency.test_response_time_llm_path ____
+../FlightAggregator/venv/lib/python3.11/site-packages/_pytest/runner.py:353: in from_call
+    result: TResult | None = func()
+                             ^^^^^^
+../FlightAggregator/venv/lib/python3.11/site-packages/_pytest/runner.py:245: in <lambda>
+    lambda: runtest_hook(item=item, **kwds),
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+../FlightAggregator/venv/lib/python3.11/site-packages/pluggy/_hooks.py:512: in __call__
+    return self._hookexec(self.name, self._hookimpls.copy(), kwargs, firstresult)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+../FlightAggregator/venv/lib/python3.11/site-packages/pluggy/_manager.py:120: in _hookexec
+    return self._inner_hookexec(hook_name, methods, kwargs, firstresult)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+../FlightAggregator/venv/lib/python3.11/site-packages/_pytest/logging.py:843: in pytest_runtest_setup
+    yield
+../FlightAggregator/venv/lib/python3.11/site-packages/_pytest/capture.py:895: in pytest_runtest_setup
+    return (yield)
+            ^^^^^
+../FlightAggregator/venv/lib/python3.11/site-packages/_pytest/runner.py:165: in pytest_runtest_setup
+    item.session._setupstate.setup(item)
+../FlightAggregator/venv/lib/python3.11/site-packages/_pytest/runner.py:523: in setup
+    col.setup()
+../FlightAggregator/venv/lib/python3.11/site-packages/_pytest/python.py:1723: in setup
+    self._request._fillfixtures()
+../FlightAggregator/venv/lib/python3.11/site-packages/_pytest/fixtures.py:707: in _fillfixtures
+    item.funcargs[argname] = self.getfixturevalue(argname)
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+../FlightAggregator/venv/lib/python3.11/site-packages/_pytest/fixtures.py:539: in getfixturevalue
+    fixturedef = self._get_active_fixturedef(argname)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+../FlightAggregator/venv/lib/python3.11/site-packages/_pytest/fixtures.py:627: in _get_active_fixturedef
+    fixturedef.execute(request=subrequest)
+../FlightAggregator/venv/lib/python3.11/site-packages/_pytest/fixtures.py:1110: in execute
+    result: FixtureValue = ihook.pytest_fixture_setup(
+../FlightAggregator/venv/lib/python3.11/site-packages/pluggy/_hooks.py:512: in __call__
+    return self._hookexec(self.name, self._hookimpls.copy(), kwargs, firstresult)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+../FlightAggregator/venv/lib/python3.11/site-packages/pluggy/_manager.py:120: in _hookexec
+    return self._inner_hookexec(hook_name, methods, kwargs, firstresult)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+../FlightAggregator/venv/lib/python3.11/site-packages/pluggy/_callers.py:53: in run_old_style_hookwrapper
+    return result.get_result()
+           ^^^^^^^^^^^^^^^^^^^
+../FlightAggregator/venv/lib/python3.11/site-packages/pluggy/_callers.py:38: in run_old_style_hookwrapper
+    res = yield
+          ^^^^^
+../FlightAggregator/venv/lib/python3.11/site-packages/_pytest/setuponly.py:36: in pytest_fixture_setup
+    return (yield)
+            ^^^^^
+../FlightAggregator/venv/lib/python3.11/site-packages/_pytest/fixtures.py:1188: in pytest_fixture_setup
+    warnings.warn(
+E   pytest.PytestRemovedIn9Warning: '' requested an async fixture 'test_engine', with no plugin or hook that handled it. This is usually an error, as pytest does not natively support it. This will turn into an error in pytest 9.
+E   See: https://docs.pytest.org/en/stable/deprecations.html#sync-test-depending-on-async-fixture
+_____ ERROR at setup of TestPerformanceAndLatency.test_concurrent_requests _____
+../FlightAggregator/venv/lib/python3.11/site-packages/_pytest/runner.py:353: in from_call
+    result: TResult | None = func()
+                             ^^^^^^
+../FlightAggregator/venv/lib/python3.11/site-packages/_pytest/runner.py:245: in <lambda>
+    lambda: runtest_hook(item=item, **kwds),
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+../FlightAggregator/venv/lib/python3.11/site-packages/pluggy/_hooks.py:512: in __call__
+    return self._hookexec(self.name, self._hookimpls.copy(), kwargs, firstresult)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+../FlightAggregator/venv/lib/python3.11/site-packages/pluggy/_manager.py:120: in _hookexec
+    return self._inner_hookexec(hook_name, methods, kwargs, firstresult)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+../FlightAggregator/venv/lib/python3.11/site-packages/_pytest/logging.py:843: in pytest_runtest_setup
+    yield
+../FlightAggregator/venv/lib/python3.11/site-packages/_pytest/capture.py:895: in pytest_runtest_setup
+    return (yield)
+            ^^^^^
+../FlightAggregator/venv/lib/python3.11/site-packages/_pytest/runner.py:165: in pytest_runtest_setup
+    item.session._setupstate.setup(item)
+../FlightAggregator/venv/lib/python3.11/site-packages/_pytest/runner.py:523: in setup
+    col.setup()
+../FlightAggregator/venv/lib/python3.11/site-packages/_pytest/python.py:1723: in setup
+    self._request._fillfixtures()
+../FlightAggregator/venv/lib/python3.11/site-packages/_pytest/fixtures.py:707: in _fillfixtures
+    item.funcargs[argname] = self.getfixturevalue(argname)
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+../FlightAggregator/venv/lib/python3.11/site-packages/_pytest/fixtures.py:539: in getfixturevalue
+    fixturedef = self._get_active_fixturedef(argname)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+../FlightAggregator/venv/lib/python3.11/site-packages/_pytest/fixtures.py:627: in _get_active_fixturedef
+    fixturedef.execute(request=subrequest)
+../FlightAggregator/venv/lib/python3.11/site-packages/_pytest/fixtures.py:1110: in execute
+    result: FixtureValue = ihook.pytest_fixture_setup(
+../FlightAggregator/venv/lib/python3.11/site-packages/pluggy/_hooks.py:512: in __call__
+    return self._hookexec(self.name, self._hookimpls.copy(), kwargs, firstresult)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+../FlightAggregator/venv/lib/python3.11/site-packages/pluggy/_manager.py:120: in _hookexec
+    return self._inner_hookexec(hook_name, methods, kwargs, firstresult)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+../FlightAggregator/venv/lib/python3.11/site-packages/pluggy/_callers.py:53: in run_old_style_hookwrapper
+    return result.get_result()
+           ^^^^^^^^^^^^^^^^^^^
+../FlightAggregator/venv/lib/python3.11/site-packages/pluggy/_callers.py:38: in run_old_style_hookwrapper
+    res = yield
+          ^^^^^
+../FlightAggregator/venv/lib/python3.11/site-packages/_pytest/setuponly.py:36: in pytest_fixture_setup
+    return (yield)
+            ^^^^^
+../FlightAggregator/venv/lib/python3.11/site-packages/_pytest/fixtures.py:1188: in pytest_fixture_setup
+    warnings.warn(
+E   pytest.PytestRemovedIn9Warning: '' requested an async fixture 'test_engine', with no plugin or hook that handled it. This is usually an error, as pytest does not natively support it. This will turn into an error in pytest 9.
+E   See: https://docs.pytest.org/en/stable/deprecations.html#sync-test-depending-on-async-fixture
+=================================== FAILURES ===================================
+_____________ TestPerformanceDifferences.test_rule_based_is_faster _____________
+async def functions are not natively supported.
+You need to install a suitable plugin for your async framework, for example:
+  - anyio
+  - pytest-asyncio
+  - pytest-tornasync
+  - pytest-trio
+  - pytest-twisted
+___________ TestPerformanceDifferences.test_cost_savings_rule_based ____________
+async def functions are not natively supported.
+You need to install a suitable plugin for your async framework, for example:
+  - anyio
+  - pytest-asyncio
+  - pytest-tornasync
+  - pytest-trio
+  - pytest-twisted
+_____________________ test_mad_libs_performance_benchmarks _____________________
+async def functions are not natively supported.
+You need to install a suitable plugin for your async framework, for example:
+  - anyio
+  - pytest-asyncio
+  - pytest-tornasync
+  - pytest-trio
+  - pytest-twisted
+_________________________ test_performance_extraction __________________________
+tests/test_unit_components.py:512: in test_performance_extraction
+    assert avg_ms < 15, f"Extraction too slow: {avg_ms:.2f}ms"
+E   AssertionError: Extraction too slow: 71.36ms
+E   assert 71.35750982496474 < 15
+----------------------------- Captured stdout call -----------------------------
+
+⚡ Rule extraction: 71.36ms avg
+=============================== warnings summary ===============================
+../FlightAggregator/venv/lib/python3.11/site-packages/pydantic/_internal/_config.py:323
+../FlightAggregator/venv/lib/python3.11/site-packages/pydantic/_internal/_config.py:323
+../FlightAggregator/venv/lib/python3.11/site-packages/pydantic/_internal/_config.py:323
+../FlightAggregator/venv/lib/python3.11/site-packages/pydantic/_internal/_config.py:323
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator/venv/lib/python3.11/site-packages/pydantic/_internal/_config.py:323: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.11/migration/
+    warnings.warn(DEPRECATION_MESSAGE, DeprecationWarning)
+
+../FlightAggregator/venv/lib/python3.11/site-packages/passlib/utils/__init__.py:854
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator/venv/lib/python3.11/site-packages/passlib/utils/__init__.py:854: DeprecationWarning: 'crypt' is deprecated and slated for removal in Python 3.13
+    from crypt import crypt as _crypt
+
+app/api/v1/endpoints/nearest_airport.py:30
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/app/api/v1/endpoints/nearest_airport.py:30: DeprecationWarning: `regex` has been deprecated, please use `pattern` instead
+    lang: str = Query("en", regex="^(en|ru|uz)$")
+
+app/api/v1/endpoints/nearest_airport.py:94
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/app/api/v1/endpoints/nearest_airport.py:94: DeprecationWarning: `regex` has been deprecated, please use `pattern` instead
+    lang: str = Query("en", regex="^(en|ru|uz)$")
+
+../FlightAggregator/venv/lib/python3.11/site-packages/pydantic/fields.py:1093: 10 warnings
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator/venv/lib/python3.11/site-packages/pydantic/fields.py:1093: PydanticDeprecatedSince20: Using extra keyword arguments on `Field` is deprecated and will be removed. Use `json_schema_extra` instead. (Extra keys: 'example'). Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.11/migration/
+    warn(
+
+app/api/v1/endpoints/airports.py:97
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/app/api/v1/endpoints/airports.py:97: DeprecationWarning: `example` has been deprecated, please use `examples` instead
+    iata_code: str = Path(
+
+../FlightAggregator/venv/lib/python3.11/site-packages/pydantic/fields.py:1062
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator/venv/lib/python3.11/site-packages/pydantic/fields.py:1062: PydanticDeprecatedSince20: `min_items` is deprecated and will be removed, use `min_length` instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.11/migration/
+    warn('`min_items` is deprecated and will be removed, use `min_length` instead', DeprecationWarning)
+
+../FlightAggregator/venv/lib/python3.11/site-packages/pydantic/fields.py:1068
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator/venv/lib/python3.11/site-packages/pydantic/fields.py:1068: PydanticDeprecatedSince20: `max_items` is deprecated and will be removed, use `max_length` instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.11/migration/
+    warn('`max_items` is deprecated and will be removed, use `max_length` instead', DeprecationWarning)
+
+app/api/v1/endpoints/duffel_flexible.py:205
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/app/api/v1/endpoints/duffel_flexible.py:205: PydanticDeprecatedSince20: Pydantic V1 style `@validator` validators are deprecated. You should migrate to Pydantic V2 style `@field_validator` validators, see the migration guide for more details. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.11/migration/
+    @validator('origin', 'destination')
+
+app/api/v1/endpoints/duffel_flexible.py:210
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/app/api/v1/endpoints/duffel_flexible.py:210: PydanticDeprecatedSince20: Pydantic V1 style `@validator` validators are deprecated. You should migrate to Pydantic V2 style `@field_validator` validators, see the migration guide for more details. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.11/migration/
+    @validator('earliest_departure', 'latest_departure')
+
+app/api/v1/endpoints/duffel_flexible.py:217
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/app/api/v1/endpoints/duffel_flexible.py:217: PydanticDeprecatedSince20: Pydantic V1 style `@validator` validators are deprecated. You should migrate to Pydantic V2 style `@field_validator` validators, see the migration guide for more details. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.11/migration/
+    @validator('latest_departure')
+
+tests/test_chat_endpoint.py:27
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_chat_endpoint.py:27: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_chat_endpoint.py:59
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_chat_endpoint.py:59: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_chat_endpoint.py:94
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_chat_endpoint.py:94: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_chat_endpoint.py:120
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_chat_endpoint.py:120: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_chat_endpoint.py:163
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_chat_endpoint.py:163: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_chat_endpoint.py:178
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_chat_endpoint.py:178: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_chat_endpoint.py:195
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_chat_endpoint.py:195: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_chat_endpoint.py:218
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_chat_endpoint.py:218: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_chat_endpoint.py:234
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_chat_endpoint.py:234: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_chat_endpoint.py:249
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_chat_endpoint.py:249: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_chat_endpoint.py:279
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_chat_endpoint.py:279: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_chat_endpoint.py:289
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_chat_endpoint.py:289: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_chat_endpoint.py:313
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_chat_endpoint.py:313: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_chat_endpoint.py:326
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_chat_endpoint.py:326: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_chat_endpoint.py:376
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_chat_endpoint.py:376: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_chat_endpoint.py:405
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_chat_endpoint.py:405: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_chat_endpoint.py:433
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_chat_endpoint.py:433: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_chat_endpoint.py:456
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_chat_endpoint.py:456: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_hybrid_routing.py:95
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_hybrid_routing.py:95: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_hybrid_routing.py:126
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_hybrid_routing.py:126: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_hybrid_routing.py:150
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_hybrid_routing.py:150: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_hybrid_routing.py:167
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_hybrid_routing.py:167: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_hybrid_routing.py:198
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_hybrid_routing.py:198: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_hybrid_routing.py:235
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_hybrid_routing.py:235: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_hybrid_routing.py:261
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_hybrid_routing.py:261: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_hybrid_routing.py:287
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_hybrid_routing.py:287: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_hybrid_routing.py:308
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_hybrid_routing.py:308: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_hybrid_routing.py:352
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_hybrid_routing.py:352: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_hybrid_routing.py:376
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_hybrid_routing.py:376: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_hybrid_routing.py:404
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_hybrid_routing.py:404: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_mad_libs_ui.py:32
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_mad_libs_ui.py:32: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_mad_libs_ui.py:118
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_mad_libs_ui.py:118: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_mad_libs_ui.py:147
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_mad_libs_ui.py:147: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_mad_libs_ui.py:200
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_mad_libs_ui.py:200: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_mad_libs_ui.py:234
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_mad_libs_ui.py:234: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_mad_libs_ui.py:272
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_mad_libs_ui.py:272: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_mad_libs_ui.py:320
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_mad_libs_ui.py:320: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_mad_libs_ui.py:374
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_mad_libs_ui.py:374: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_mad_libs_ui.py:405
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_mad_libs_ui.py:405: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_mad_libs_ui.py:443
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_mad_libs_ui.py:443: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_mad_libs_ui.py:473
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_mad_libs_ui.py:473: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_mad_libs_ui.py:503
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_mad_libs_ui.py:503: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_mad_libs_ui.py:535
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_mad_libs_ui.py:535: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_mad_libs_ui.py:563
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_mad_libs_ui.py:563: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_multi_turn_persistence.py:22
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_multi_turn_persistence.py:22: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_multi_turn_persistence.py:65
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_multi_turn_persistence.py:65: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_multi_turn_persistence.py:93
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_multi_turn_persistence.py:93: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_multi_turn_persistence.py:120
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_multi_turn_persistence.py:120: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_multi_turn_persistence.py:137
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_multi_turn_persistence.py:137: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_multi_turn_persistence.py:169
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_multi_turn_persistence.py:169: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_multi_turn_persistence.py:194
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_multi_turn_persistence.py:194: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_multi_turn_persistence.py:220
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_multi_turn_persistence.py:220: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_multi_turn_persistence.py:245
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_multi_turn_persistence.py:245: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_multi_turn_persistence.py:264
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_multi_turn_persistence.py:264: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_multi_turn_persistence.py:293
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_multi_turn_persistence.py:293: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_multi_turn_persistence.py:315
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_multi_turn_persistence.py:315: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_multi_turn_persistence.py:337
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_multi_turn_persistence.py:337: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_multi_turn_persistence.py:374
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_multi_turn_persistence.py:374: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_multi_turn_persistence.py:395
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_multi_turn_persistence.py:395: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_multi_turn_persistence.py:414
+  /Users/abdulazizmadaminov/Desktop/FlightAggregator 2/tests/test_multi_turn_persistence.py:414: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+============================= slowest 10 durations =============================
+6.42s call     tests/test_unit_components.py::test_performance_extraction
+
+(9 durations < 0.005s hidden.  Use -vv to show these durations.)
+=========================== short test summary info ============================
+FAILED tests/test_hybrid_routing.py::TestPerformanceDifferences::test_rule_based_is_faster
+FAILED tests/test_hybrid_routing.py::TestPerformanceDifferences::test_cost_savings_rule_based
+FAILED tests/test_mad_libs_ui.py::test_mad_libs_performance_benchmarks - Fail...
+FAILED tests/test_unit_components.py::test_performance_extraction - Assertion...
+ERROR tests/test_chat_endpoint.py::TestPerformanceAndLatency::test_response_time_rule_based
+ERROR tests/test_chat_endpoint.py::TestPerformanceAndLatency::test_response_time_llm_path
+ERROR tests/test_chat_endpoint.py::TestPerformanceAndLatency::test_concurrent_requests
+====== 4 failed, 1 passed, 94 deselected, 83 warnings, 3 errors in 7.15s =======
+
+
+
+======================================================================
+ TEST EXECUTION SUMMARY
+======================================================================
+  FAIL  Unit Tests
+  FAIL  Integration Tests
+  FAIL  Mad Libs UI Tests
+  FAIL  E2E Tests
+  FAIL  API Tests
+  FAIL  Performance Tests
+======================================================================
+  Total: 6 suites
+  Passed: 0
+  Failed: 6
+  Pass Rate: 0.0%
+======================================================================
+ End Time: 2025-11-20 12:32:29
+======================================================================

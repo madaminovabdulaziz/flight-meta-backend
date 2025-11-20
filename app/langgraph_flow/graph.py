@@ -5,13 +5,12 @@ Main orchestration graph with intelligent rule-based/LLM routing for AI Trip Pla
 """
 
 import logging
-from typing import Literal, Optional
+from typing import Literal, Optional, Dict, Any
 
 from langgraph.graph import StateGraph, END
 
 from app.langgraph_flow.state import ConversationState, create_initial_state
 from app.langgraph_flow.nodes.entry_node import entry_node
-from app.langgraph_flow.nodes.load_session_state_node import load_session_state_node
 from app.langgraph_flow.nodes.load_user_memory_node import load_user_memory_node
 from app.langgraph_flow.nodes.should_use_llm_node import (
     should_use_llm_node,
@@ -25,6 +24,7 @@ from app.langgraph_flow.nodes.refusal_node import refusal_node
 from app.langgraph_flow.nodes.flight_search_node import flight_search_node
 from app.langgraph_flow.nodes.ranking_node import ranking_node
 from app.langgraph_flow.nodes.finalize_response_node import finalize_response_node
+
 
 # Rule-based path nodes
 from app.langgraph_flow.nodes.rule_based_question_node import rule_based_question_node
@@ -105,6 +105,9 @@ def route_after_flight_search(
 def create_trip_planner_graph() -> StateGraph:
     """
     Build the production-ready hybrid LangGraph with clean separation of concerns.
+    
+    CRITICAL: This graph does NOT handle session loading/saving.
+    That is the responsibility of the caller (chat.py).
     """
 
     graph = StateGraph(ConversationState)
@@ -115,7 +118,7 @@ def create_trip_planner_graph() -> StateGraph:
 
     # Common entry nodes
     graph.add_node("entry", entry_node)
-    graph.add_node("load_session_state", load_session_state_node)
+    # NOTE: load_session_state_node REMOVED - done outside graph
     graph.add_node("load_user_memory", load_user_memory_node)
 
     # Router
@@ -137,15 +140,15 @@ def create_trip_planner_graph() -> StateGraph:
     graph.add_node("flight_search", flight_search_node)
     graph.add_node("finalize_response", finalize_response_node)
 
+
     # ------------------------
     # EDGE DEFINITIONS
     # ------------------------
 
     graph.set_entry_point("entry")
 
-    # Common entry flow
-    graph.add_edge("entry", "load_session_state")
-    graph.add_edge("load_session_state", "load_user_memory")
+    # Common entry flow (UPDATED: no load_session_state)
+    graph.add_edge("entry", "load_user_memory")
     graph.add_edge("load_user_memory", "should_use_llm")
 
     # Routing decision
@@ -153,7 +156,7 @@ def create_trip_planner_graph() -> StateGraph:
         "should_use_llm",
         route_based_on_confidence,
         {
-            "rule_based_path": "determine_missing_slot",
+            "rule_based_path": "extract_parameters",
             "llm_path": "classify_intent",
         },
     )
@@ -214,7 +217,7 @@ logger.info("🚀 Performance target: 80-95% requests use rule-based path")
 
 
 # ==========================================
-# GRAPH EXECUTION
+# GRAPH EXECUTION - NEW SIMPLIFIED VERSION
 # ==========================================
 
 async def run_conversation_turn(
@@ -224,6 +227,16 @@ async def run_conversation_turn(
 ) -> ConversationState:
     """
     Execute one conversation turn with proper state persistence.
+    
+    NEW ARCHITECTURE:
+    1. Load state ONCE (outside graph)
+    2. Execute graph with fresh state
+    3. Save state ONCE (outside graph)
+    
+    This ensures:
+    - No double-load
+    - No routing field corruption
+    - Atomic save to both Redis and DB
     """
     from app.db.database import AsyncSessionLocal
     from app.db.crud.session import load_session_state, save_session_state
@@ -234,80 +247,80 @@ async def run_conversation_turn(
 
     logger.info(f"🚀 Starting conversation turn for session {session_id}")
 
-    # ------------------------
-    # STEP 1: LOAD EXISTING STATE (Redis first, then DB)
-    # ------------------------
-    initial_state: Optional[ConversationState] = None
+    # ========================================
+    # STEP 1: LOAD STATE (Outside Graph)
+    # ========================================
     
+    loaded_state: Optional[ConversationState] = None
+    
+    # Try Redis first (fast cache)
     try:
-        # Try Redis first (faster)
-        redis_state = await get_session_state_from_redis(session_id)
+        redis_data = await get_session_state_from_redis(session_id)
         
-        if redis_state and isinstance(redis_state, dict):
+        if redis_data and isinstance(redis_data, dict):
             # Convert Redis dict to ConversationState
-            allowed_fields = set(ConversationState.__dataclass_fields__.keys())
-            filtered = {k: v for k, v in redis_state.items() if k in allowed_fields}
-            initial_state = ConversationState(**filtered)
-            logger.info(f"📂 Loaded state from Redis (turn {initial_state.turn_count or 0})")
+            # ONLY restore non-routing fields
+            loaded_state = _restore_state_from_dict(redis_data, session_id)
+            logger.info(f"📂 Loaded state from Redis (turn {loaded_state.turn_count or 0})")
             
     except Exception as e:
         logger.warning(f"⚠️ Redis load failed: {e}, trying DB...")
 
     # Fallback to DB if Redis failed
-    if initial_state is None:
+    if loaded_state is None:
         try:
             async with AsyncSessionLocal() as db:
-                db_state = await load_session_state(db, session_id=session_id)
+                db_data = await load_session_state(db, session_id=session_id)
                 
-                if db_state:
-                    if isinstance(db_state, ConversationState):
-                        initial_state = db_state
-                    elif isinstance(db_state, dict):
-                        allowed_fields = set(ConversationState.__dataclass_fields__.keys())
-                        filtered = {k: v for k, v in db_state.items() if k in allowed_fields}
-                        initial_state = ConversationState(**filtered)
-                    
-                    logger.info(f"📂 Loaded state from DB (turn {initial_state.turn_count or 0})")
+                if db_data:
+                    loaded_state = _restore_state_from_dict(db_data, session_id)
+                    logger.info(f"📂 Loaded state from DB (turn {loaded_state.turn_count or 0})")
                     
         except Exception as e:
             logger.warning(f"⚠️ DB load failed: {e}")
 
     # Create new state if nothing was loaded
-    if initial_state is None:
+    if loaded_state is None:
         logger.info("🆕 Creating new session")
-        initial_state = create_initial_state(
+        loaded_state = create_initial_state(
             session_id=session_id,
             user_id=user_id,
             latest_message=user_message,
         )
-    else:
-        # Update existing state for new turn
-        logger.info(f"📝 Continuing existing session (turn {initial_state.turn_count + 1})")
 
-    # Update state with current turn info
-    initial_state.turn_count = (initial_state.turn_count or 0) + 1
-    initial_state.latest_user_message = user_message
+    # ========================================
+    # STEP 2: PREPARE STATE FOR GRAPH
+    # ========================================
+    
+    # Update state for current turn
+    loaded_state.turn_count = (loaded_state.turn_count or 0) + 1
+    loaded_state.latest_user_message = user_message
     
     # Append to conversation history
-    if not initial_state.conversation_history:
-        initial_state.conversation_history = []
-    initial_state.conversation_history.append({
+    if not loaded_state.conversation_history:
+        loaded_state.conversation_history = []
+    loaded_state.conversation_history.append({
         "role": "user",
         "content": user_message,
-        "turn": initial_state.turn_count,
+        "turn": loaded_state.turn_count,
     })
 
-    # ------------------------
-    # STEP 2: EXECUTE GRAPH
-    # ------------------------
+    logger.info(
+        f"📝 Prepared state: turn {loaded_state.turn_count}, "
+        f"session {session_id[:12]}..."
+    )
+
+    # ========================================
+    # STEP 3: EXECUTE GRAPH
+    # ========================================
+    
     try:
-        result = await trip_planner_graph.ainvoke(initial_state)
+        result = await trip_planner_graph.ainvoke(loaded_state)
 
         # Convert result to ConversationState if needed
         if isinstance(result, dict):
-            allowed_fields = set(ConversationState.__dataclass_fields__.keys())
-            filtered_result = {k: v for k, v in result.items() if k in allowed_fields}
-            final_state = ConversationState(**filtered_result)
+            # Graph returned dict - convert to state
+            final_state = _convert_dict_to_state(result, session_id)
         elif isinstance(result, ConversationState):
             final_state = result
         else:
@@ -343,26 +356,122 @@ async def run_conversation_turn(
         logger.error(f"❌ Graph execution failed: {e}", exc_info=True)
         raise
 
-    # ------------------------
-    # STEP 3: *** SAVE STATE *** (THE MISSING PIECE!)
-    # ------------------------
+    # ========================================
+    # STEP 4: SAVE STATE (Outside Graph)
+    # ========================================
+    
     try:
-        # Save to Redis (fast, temporary)
-        await save_session_state_to_redis(session_id, final_state)
-        logger.debug("✅ State saved to Redis")
-        
-        # Save to DB (persistent, slower) - do in background if possible
+        # Save to DB first (source of truth)
         async with AsyncSessionLocal() as db:
             await save_session_state(db, session_id=session_id, state=final_state)
             await db.commit()
         logger.debug("✅ State saved to DB")
         
+        # Then save to Redis (cache) - only after DB succeeds
+        await save_session_state_to_redis(session_id, final_state)
+        logger.debug("✅ State saved to Redis")
+        
     except Exception as e:
         logger.error(f"❌ Failed to save state: {e}", exc_info=True)
-        # Don't fail the request if save fails, but log it prominently
-        # The state is still returned to the user
+        # Don't fail the request if save fails
+        # State is still returned to user and will be in memory
 
     return final_state
+
+
+# ==========================================
+# STATE RESTORATION HELPERS
+# ==========================================
+
+# Fields that should NEVER be restored from old state
+ROUTING_FIELDS = {
+    "use_rule_based_path",
+    "routing_confidence",
+    "confidence_breakdown",
+    "intent",
+    "llm_intent",
+    "extracted_params",
+}
+
+# Fields that are only for current turn (don't restore)
+TRANSIENT_FIELDS = {
+    "latest_user_message",
+    "assistant_message",
+    "next_placeholder",
+}
+
+
+def _restore_state_from_dict(
+    data: Dict[str, Any],
+    session_id: str
+) -> ConversationState:
+    """
+    Restore state from dict, excluding routing and transient fields.
+    
+    This ensures:
+    - Routing decisions are made fresh each turn
+    - Old assistant messages don't leak through
+    - Session continuity for slots and history
+    """
+    if not isinstance(data, dict):
+        logger.warning(f"Invalid state data type: {type(data)}")
+        return create_initial_state(session_id=session_id, user_id=None, latest_message="")
+    
+    # Get all valid field names from ConversationState
+    allowed_fields = set(ConversationState.__dataclass_fields__.keys())
+    
+    # Filter to only allowed fields, excluding routing and transient
+    filtered = {}
+    for k, v in data.items():
+        if k in allowed_fields and k not in ROUTING_FIELDS and k not in TRANSIENT_FIELDS:
+            filtered[k] = v
+    
+    # Ensure session_id is set
+    filtered["session_id"] = session_id
+    
+    # Convert date strings back to date objects
+    from datetime import datetime, date
+    
+    for date_field in ["departure_date", "return_date"]:
+        if date_field in filtered and isinstance(filtered[date_field], str):
+            try:
+                filtered[date_field] = date.fromisoformat(filtered[date_field])
+            except:
+                filtered[date_field] = None
+    
+    for datetime_field in ["created_at", "updated_at", "search_timestamp"]:
+        if datetime_field in filtered and isinstance(filtered[datetime_field], str):
+            try:
+                filtered[datetime_field] = datetime.fromisoformat(filtered[datetime_field])
+            except:
+                if datetime_field in ["created_at", "updated_at"]:
+                    filtered[datetime_field] = datetime.utcnow()
+                else:
+                    filtered[datetime_field] = None
+    
+    try:
+        return ConversationState(**filtered)
+    except Exception as e:
+        logger.error(f"Failed to restore state: {e}", exc_info=True)
+        return create_initial_state(session_id=session_id, user_id=None, latest_message="")
+
+
+def _convert_dict_to_state(result: dict, session_id: str) -> ConversationState:
+    """
+    Convert graph result dict to ConversationState.
+    
+    Used when graph returns dict instead of state object.
+    """
+    allowed_fields = set(ConversationState.__dataclass_fields__.keys())
+    filtered = {k: v for k, v in result.items() if k in allowed_fields}
+    filtered["session_id"] = session_id
+    
+    try:
+        return ConversationState(**filtered)
+    except Exception as e:
+        logger.error(f"Failed to convert dict to state: {e}", exc_info=True)
+        raise
+
 
 # ==========================================
 # GRAPH VISUALIZATION

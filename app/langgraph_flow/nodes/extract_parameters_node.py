@@ -1,268 +1,213 @@
 """
-Extract Parameters Node - Production-Ready LLM Fallback
-=======================================================
-LLM-based parameter extraction for low-confidence queries.
+Extract Parameters Node - Unified Production Version
+====================================================
+Handles BOTH Rule-Based (passed from router) and LLM extraction logic.
+Serves as the central "Commit" point for all state changes.
 """
 
 import logging
 from datetime import date
-from typing import Any, Dict, Optional, List
-
+from typing import Any, Dict, Optional
 from app.langgraph_flow.state import ConversationState, update_state
 
 logger = logging.getLogger(__name__)
 
 
-# ==========================================
-# CONFIGURATION
-# ==========================================
-
-PARAMETER_FIELDS = [
-    "destination",
-    "origin",
-    "departure_date",
-    "return_date",
-    "passengers",
-    "travel_class",
-    "budget",
-    "flexibility",
-]
-
-SYSTEM_PROMPT = """Extract flight parameters from the user's message.
-
-Return JSON with these keys (use null if not present):
-{
-  "destination": string|null,
-  "origin": string|null,
-  "departure_date": "YYYY-MM-DD"|null,
-  "return_date": "YYYY-MM-DD"|null,
-  "passengers": int|null,
-  "travel_class": "Economy"|"Premium Economy"|"Business"|"First"|null,
-  "budget": float|null,
-  "flexibility": int|null
-}
-
-Do not guess. Use null when unsure."""
-
-
-# ==========================================
+# ============================================================================
 # UTILITIES
-# ==========================================
+# ============================================================================
 
 def _parse_date(value: Optional[str]) -> Optional[date]:
+    """Parse date string safely."""
     if not value or not isinstance(value, str):
         return None
     try:
         return date.fromisoformat(value)
     except (ValueError, TypeError):
-        logger.warning(f"[ExtractParams] Invalid date format: {value}")
         return None
 
 
-def _normalize_airport_code(code: Optional[str]) -> List[str]:
-    if not code or not isinstance(code, str):
-        return []
-    code = code.strip().upper()
-    if len(code) == 3 and code.isalpha():
-        return [code]
-    return []
-
-
-def _merge_extracted_params(
-    state: ConversationState,
-    extracted: Dict[str, Any],
-    is_change_of_plan: bool = False
-) -> Dict[str, Any]:
-
-    updates = {}
-
-    for key, value in extracted.items():
-        if value is None or value == "":
-            continue
-
-        if is_change_of_plan:
-            updates[key] = value
-            logger.info(f"[ExtractParams] Overwriting {key}: {value} (change_of_plan)")
-
-        else:
-            existing = getattr(state, key, None)
-            if existing in (None, "", 0):
-                updates[key] = value
-                logger.debug(f"[ExtractParams] Setting {key}: {value}")
-
-    return updates
-
-
-def _add_derived_fields(state: ConversationState, updates: Dict[str, Any]) -> Dict[str, Any]:
-    destination = updates.get("destination", getattr(state, "destination", None))
-    origin = updates.get("origin", getattr(state, "origin", None))
-    return_date = updates.get("return_date", getattr(state, "return_date", None))
-
-    if destination:
-        dest_airports = _normalize_airport_code(destination)
-        if dest_airports:
-            updates["destination_airports"] = dest_airports
-
-    if origin:
-        orig_airports = _normalize_airport_code(origin)
-        if orig_airports:
-            updates["origin_airports"] = orig_airports
-
-    updates["is_round_trip"] = bool(return_date)
-
-    return updates
-
-
-# ==========================================
+# ============================================================================
 # MAIN NODE
-# ==========================================
+# ============================================================================
 
 async def extract_parameters_node(state: ConversationState) -> ConversationState:
+    """
+    Unified extraction node.
+    
+    Sources of Data:
+    1. Rule-Based: Data passed from 'should_use_llm_node' in 'extracted_params'
+    2. LLM: Generated on-the-fly via 'generate_json_response'
+    
+    Both sources flow through the SAME "Smart Merge" logic to ensure safety.
+    """
+    
+    missing_parameter = getattr(state, "missing_parameter", None)
+    extraction_data = {}
+    source_label = "LLM"
 
-    # Guard rail: skip if rule-based path
+    # ========================================
+    # PATH 1: Rule-Based (Pre-calculated)
+    # ========================================
     if getattr(state, "use_rule_based_path", False):
-        logger.info("[ExtractParams] Rule-based path active → skipping LLM extraction")
-        return state
+        logger.info("[ExtractParams] Rule-based path detected. Processing pre-extracted params.")
+        
+        # 1. Get the data passed from should_use_llm_node
+        extraction_data = getattr(state, "extracted_params", {}) or {}
+        source_label = "Rule-Based"
+        
+        if not extraction_data:
+            logger.warning("[ExtractParams] Rule path active but 'extracted_params' is empty.")
 
-    latest_message = getattr(state, "latest_user_message", "")
+    # ========================================
+    # PATH 2: LLM Extraction (On-the-fly)
+    # ========================================
+    else:
+        latest_message = state.latest_user_message
+        if not latest_message:
+            return state
 
-    if not latest_message or not latest_message.strip():
-        logger.warning("[ExtractParams] Empty message, skipping extraction")
-        return state
-
-    logger.info(f"[ExtractParams] Extracting from: '{latest_message[:80]}...'")
-
-    # LLM extraction
-    try:
+        logger.info(f"[ExtractParams] LLM path detected. Extracting from: '{latest_message[:30]}...'")
+        
         from services.llm_service import generate_json_response
+        
+        try:
+            # Use the context-aware prompt builder defined in your file (omitted here for brevity, assumed available)
+            # If it's a local function, ensure it is defined or imported
+            from app.langgraph_flow.nodes.extract_parameters_node import build_context_aware_prompt_internal
+            system_prompt = build_context_aware_prompt_internal(state, latest_message)
+            
+            extraction_data = await generate_json_response(
+                system_prompt=system_prompt,
+                user_prompt=latest_message
+            )
+        except Exception as e:
+            # If import fails (because function is local), define simple prompt
+            try:
+                # Fallback prompt logic if helper is missing
+                logger.warning(f"[ExtractParams] using fallback prompt due to error: {e}")
+                extraction_data = await generate_json_response(
+                    system_prompt="Extract travel data (origin, destination, date) from user input.",
+                    user_prompt=latest_message
+                )
+            except Exception as inner_e:
+                logger.error(f"[ExtractParams] LLM failed: {inner_e}")
+                return state
 
-        response = await generate_json_response(
-            system_prompt=SYSTEM_PROMPT,
-            user_prompt=latest_message,
-        )
+    # ========================================
+    # UNIFIED SMART MERGE LOGIC
+    # ========================================
+    # This logic now runs for BOTH paths (Rule & LLM)
+    
+    updates = {}
+    all_fields = ["origin", "destination", "departure_date", "return_date", "passengers", "travel_class", "budget"]
+    
+    logger.info(f"[ExtractParams] Merging data from source: {source_label}")
 
-        logger.debug(f"[ExtractParams] Raw LLM response: {response}")
+    for key in all_fields:
+        new_val = extraction_data.get(key)
+        
+        # Skip empty/null
+        if new_val in [None, "null", "", []]:
+            continue
+            
+        # ------------------------------------
+        # Logic A: Targeted Update (We asked for this)
+        # ------------------------------------
+        if missing_parameter and key == missing_parameter:
+            logger.info(f"[{source_label}] ✅ Updating REQUESTED slot '{key}' -> {new_val}")
+            updates[key] = _sanitize_value(key, new_val)
 
-    except Exception as e:
-        logger.error(f"[ExtractParams] LLM extraction failed: {e}", exc_info=True)
-        return state
+        # ------------------------------------
+        # Logic B: Safe Fill (Slot is empty)
+        # ------------------------------------
+        else:
+            current_val = getattr(state, key, None)
+            if not current_val:
+                logger.info(f"[{source_label}] 🔹 Filling EMPTY slot '{key}' -> {new_val}")
+                updates[key] = _sanitize_value(key, new_val)
+            
+            # ------------------------------------
+            # Logic C: Conflict Protection (Slot is full)
+            # ------------------------------------
+            else:
+                # If we are on Rule-Based path, we trust the Router's decision implicitly
+                # UNLESS it conflicts with what we asked for.
+                
+                # Example: User said "Tashkent". Rule extracted "Tashkent" as Origin (correct).
+                # But Rule might ALSO accidentally extract "Tashkent" as Destination (if regex matches).
+                # We must protect the field we DIDN'T ask for if it's already set.
+                
+                if key in ["origin", "destination"]:
+                    logger.info(
+                        f"[{source_label}] 🛡️ Protecting existing '{key}'={current_val}. "
+                        f"Ignoring update to {new_val}."
+                    )
+                else:
+                    # Allow updates for other fields (e.g. changing date)
+                    updates[key] = _sanitize_value(key, new_val)
 
-    # Parse fields
-    extracted_raw = {}
+    # ========================================
+    # Derived Fields & Validation
+    # ========================================
+    
+    # Helper to set array fields
+    if "destination" in updates:
+        val = str(updates["destination"])
+        if len(val) == 3: updates["destination_airports"] = [val.upper()]
+            
+    if "origin" in updates:
+        val = str(updates["origin"])
+        if len(val) == 3: updates["origin_airports"] = [val.upper()]
 
-    for field in PARAMETER_FIELDS:
-        value = response.get(field)
-
-        if value is not None:
-
-            if field in ("departure_date", "return_date"):
-                value = _parse_date(value)
-
-            elif field == "passengers":
-                try:
-                    value = int(value) if value else None
-                except:
-                    logger.warning(f"[ExtractParams] Invalid passengers: {value}")
-                    value = None
-
-            elif field == "budget":
-                try:
-                    value = float(value) if value else None
-                except:
-                    logger.warning(f"[ExtractParams] Invalid budget: {value}")
-                    value = None
-
-            elif field == "flexibility":
-                try:
-                    value = int(value) if value else None
-                except:
-                    logger.warning(f"[ExtractParams] Invalid flexibility: {value}")
-                    value = None
-
-            extracted_raw[field] = value
-
-    logger.info(f"[ExtractParams] Extracted fields: {[k for k,v in extracted_raw.items() if v is not None]}")
-
-    # Merge with state
-    intent = getattr(state, "intent", "")
-    is_change_of_plan = (intent == "change_of_plan")
-
-    updates = _merge_extracted_params(
-        state=state,
-        extracted=extracted_raw,
-        is_change_of_plan=is_change_of_plan
-    )
-
-    updates = _add_derived_fields(state, updates)
-
-    logger.info(f"[ExtractParams] Applying updates: {list(updates.keys())}")
+    # Final Safety Check: Same Origin/Dest
+    final_origin = updates.get("origin", state.origin)
+    final_destination = updates.get("destination", state.destination)
+    
+    if final_origin and final_destination and final_origin.upper() == final_destination.upper():
+         logger.warning(f"[ExtractParams] ⛔ Conflict detected: Origin == Destination ({final_origin}). Reverting update.")
+         # Revert the field that was just updated
+         if "origin" in updates and missing_parameter == "destination":
+             del updates["origin"]
+         elif "destination" in updates and missing_parameter == "origin":
+             del updates["destination"]
+         # If both were updated or we can't tell, delete the one we asked for to force re-ask
+         elif missing_parameter in updates:
+             del updates[missing_parameter]
 
     return update_state(state, updates)
 
 
-# ==========================================
-# TESTING UTILITIES
-# ==========================================
-
-async def test_extraction(message: str) -> Dict[str, Any]:
-    import time
-    from services.llm_service import generate_json_response
-
-    start = time.time()
-
-    try:
-        response = await generate_json_response(
-            system_prompt=SYSTEM_PROMPT,
-            user_prompt=message,
-        )
-
-        extracted = {field: response.get(field) for field in PARAMETER_FIELDS}
-
-        return {
-            "message": message,
-            "extracted": extracted,
-            "elapsed_ms": int((time.time() - start) * 1000),
-            "raw_response": response,
-        }
-
-    except Exception as e:
-        return {
-            "message": message,
-            "extracted": {},
-            "elapsed_ms": int((time.time() - start) * 1000),
-            "error": str(e),
-        }
+def _sanitize_value(key: str, value: Any) -> Any:
+    """Helper to format values correctly"""
+    if key in ["departure_date", "return_date"]:
+        return _parse_date(str(value))
+    if key == "passengers":
+        try: return int(value)
+        except: return 1
+    return value
 
 
-def get_extraction_coverage(state: ConversationState) -> Dict[str, Any]:
-    filled = []
-    missing = []
+# ============================================================================
+# PROMPT BUILDER (Included to ensure self-contained execution)
+# ============================================================================
 
-    for field in PARAMETER_FIELDS:
-        value = getattr(state, field, None)
-        if value not in (None, "", 0):
-            filled.append(field)
-        else:
-            missing.append(field)
+def build_context_aware_prompt_internal(state: ConversationState, message: str) -> str:
+    missing = getattr(state, "missing_parameter", None)
+    context_str = ""
+    if state.origin: context_str += f"Origin: {state.origin}\n"
+    if state.destination: context_str += f"Destination: {state.destination}\n"
+    
+    focus_instruction = ""
+    if missing:
+        focus_instruction = f"USER WAS ASKED FOR: {missing.upper()}. Focus on extracting that."
 
-    return {
-        "filled_params": filled,
-        "missing_params": missing,
-        "coverage_percent": len(filled) / len(PARAMETER_FIELDS) * 100,
-    }
-
-
-def should_skip_llm_extraction(state: ConversationState) -> bool:
-    if getattr(state, "use_rule_based_path", False):
-        return True
-
-    if not getattr(state, "latest_user_message", "").strip():
-        return True
-
-    critical = ["destination", "origin", "departure_date"]
-    all_filled = all(getattr(state, c, None) for c in critical)
-
-    if all_filled and getattr(state, "intent", "") != "change_of_plan":
-        return True
-
-    return False
+    return f"""
+    Extract travel details from the user message.
+    JSON Output keys: origin, destination, departure_date, return_date, passengers, travel_class.
+    
+    KNOWN CONTEXT:
+    {context_str}
+    
+    {focus_instruction}
+    """
